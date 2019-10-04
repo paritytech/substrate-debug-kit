@@ -15,6 +15,7 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 #![warn(missing_docs)]
+#![warn(unused_extern_crates)]
 
 //! An extended version of the code in `substrate/node/rpc-client/` which reads the staking info
 //! of a chain and runs the phragmen election with the given parameters offline.
@@ -39,6 +40,7 @@ use staking::{StakingLedger, ValidatorPrefs};
 // TODO: clean function interfaces: probably no more passing string.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
 // TODO: read number of candidates and minimum from the chain.
+// TODO: allow tweaking some parameters from cli?
 
 /// A staker
 #[derive(Debug)]
@@ -70,12 +72,14 @@ mod keys {
 		StorageKey(twox_128(storage_key.as_bytes()).to_vec())
 	}
 
+	/// create key for a map.
 	pub fn map(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
 		let mut storage_key = Vec::from((module + " " + &storage).as_bytes());
 		storage_key.extend_from_slice(&encoded_key);
 		StorageKey(blake2_256(storage_key.as_slice()).to_vec())
 	}
 
+	/// create key for a linked_map head.
 	pub fn linked_map_head(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
 		let key_string = "head of ".to_string() + &module + " " + &storage;
 		let mut key = key_string.as_bytes().to_vec();
@@ -85,16 +89,20 @@ mod keys {
 	}
 }
 
+/// Some helpers to read storage.
 mod storage {
 	use super::{Hash, StateClient, StorageKey, Future, Decode, Debug, Linkage};
 	use super::storage;
 	use super::keys;
 
+	/// Read from a raw key regardless of the type.
 	pub fn read<T: Decode>(key: StorageKey, client: &StateClient<Hash>) -> Option<T> {
 		let encoded = client.storage(key, None).wait().unwrap().map(|d| d.0)?;
 		<T as Decode>::decode(&mut encoded.as_slice()).ok()
 	}
 
+	/// enumerate and return all pairings of a linked map. Hopefully substrate will provide easier
+	/// ways of doing this in the future.
 	pub fn enumerate_linked_map<K, T>(
 		module: String,
 		storage: String,
@@ -141,10 +149,18 @@ mod storage {
 	}
 }
 
-/// Some implementations that need to be in sync with how the network is working.
+/// Some implementations that need to be in sync with how the network is working. See the runtime
+/// of the node to which you are connecting for details.
 mod network {
 	use super::{Balance, Convert};
 
+	pub const TOLERANCE: u128 = 0_u128;
+	pub const ITERATIONS: usize = 2_usize;
+
+	pub const VALIDATOR_COUNT: usize = 50;
+	pub const MIN_VALIDATOR_COUNT: usize = 10;
+
+	/// a way to attach the total issuance to `CurrencyToVoteHandler`.
 	pub trait GetTotalIssuance {
 		fn get_total_issuance() -> Balance;
 	}
@@ -166,19 +182,18 @@ mod network {
 }
 
 fn main() {
-	env_logger::init();
-
 	rt::run(rt::lazy(|| {
-
+		// WILL NOT WORK. to connect to a remote node. Yet, the ws client is not being properly
+		// created and there is no way to pass SSL cert. stuff.
 		// let uri = "wss://canary-5.kusama.network/";
 		// let URL = url::Url::parse(uri).unwrap();
-		// println!("HERE {:?}", URL);
 		// let client: StateClient<Hash> = ws::connect(&URL).wait().unwrap();
 
+		// connect to a local node.
 		let uri = "http://localhost:9933";
 		let client: StateClient<Hash> = http::connect(uri).wait().unwrap();
 
-		println!("Connected to [{}]", uri);
+		println!("++ connected to [{}]", uri);
 
 		// stash key of all wannabe candidates.
 		let validators = storage::enumerate_linked_map::<
@@ -200,12 +215,11 @@ fn main() {
 			&client,
 		);
 
-		println!("++ validators {:?}", validators.len());
-		println!("++ nominators {:?}", nominators.len());
+		println!("++ validator count {:?}", validators.len());
+		println!("++ nominator count {:?}", nominators.len());
 
 		// get the slashable balance of every entity
-		// TODO: rename this.
-		let mut slashable_balance_of: BTreeMap<AccountId, Staker> = BTreeMap::new();
+		let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
 
 		let mut all_stakers = validators.clone();
 		all_stakers.extend(nominators.iter().map(|(n, _)| n.clone()).collect::<Vec<AccountId>>());
@@ -220,14 +234,15 @@ fn main() {
 				&client,
 			).expect("All stakers must have a ledger.");
 
-			slashable_balance_of.insert(stash.clone(), Staker { ctrl, ledger});
+			staker_infos.insert(stash.clone(), Staker { ctrl, ledger});
 		});
 
 		let slashable_balance = |who: &AccountId| -> Balance {
 			// NOTE: if we panic here then someone has voted for a non-candidate afaik.
-			slashable_balance_of.get(who).unwrap().ledger.active
+			staker_infos.get(who).unwrap().ledger.active
 		};
 
+		// Get the total issuance and update the global pointer to it.
 		let mut total_issuance = storage::read::<Balance>(
 			keys::value(
 				"Balances".to_string(),
@@ -235,6 +250,7 @@ fn main() {
 			),
 			&client,
 		).unwrap();
+
 		println!("++ total_issuance = {}", total_issuance);
 		unsafe { ISSUANCE = &mut total_issuance; }
 
@@ -247,14 +263,15 @@ fn main() {
 			}
 		}
 
+		// run phragmen
 		let PhragmenResult { winners, assignments } = elect::<
 			AccountId,
 			Balance,
 			_,
 			network::CurrencyToVoteHandler<TotalIssuance>
 		>(
-			50usize,
-			10usize,
+			network::VALIDATOR_COUNT,
+			network::MIN_VALIDATOR_COUNT,
 			validators.clone(),
 			nominators.clone(),
 			slashable_balance,
@@ -279,17 +296,14 @@ fn main() {
 		for (n, assignment) in assignments.iter() {
 			for (c, per_thing) in assignment.iter() {
 				let nominator_stake = to_votes(slashable_balance(n));
-				// AUDIT: it is crucially important for the `Mul` implementation of all
-				// per-things to be sound.
 				let other_stake = *per_thing * nominator_stake;
 				let support= supports.get_mut(c).unwrap();
-				// For an astronomically rich validator with more astronomically rich
-				// set of nominators, this might saturate.
 				support.total = support.total.saturating_add(other_stake);
 				support.others.push((n.clone(), other_stake));
 			}
 		}
 
+		// prepare and run post-processing.
 		let mut staked_assignments
 			: Vec<(AccountId, Vec<PhragmenStakedAssignment<AccountId>>)>
 			= Vec::with_capacity(assignments.len());
@@ -305,8 +319,6 @@ fn main() {
 			staked_assignments.push((n.clone(), staked_assignment));
 		}
 
-		let tolerance = 0_u128;
-		let iterations = 2_usize;
 		equalize::<
 			_,
 			_,
@@ -315,14 +327,14 @@ fn main() {
 		>(
 			staked_assignments,
 			&mut supports,
-			tolerance,
-			iterations,
+			network::TOLERANCE,
+			network::ITERATIONS,
 			slashable_balance,
 		);
 
 		println!("######################################\n +++ Original Assignments (with equalize, this is not outdated.):");
 		assignments.iter().enumerate().for_each(|(i, (n, assignment_vec))| {
-			let staker_info = slashable_balance_of.get(&n).unwrap();
+			let staker_info = staker_infos.get(&n).unwrap();
 			println!("#{} {:?} // active_stake = {}", i, n, KSM(staker_info.ledger.active));
 			println!("  Distributions:");
 			assignment_vec.iter().enumerate().for_each(|(i, (c, p))| {
@@ -347,7 +359,7 @@ fn main() {
 				KSM(others_sum),
 				others_sum * 100 / support.total,
 				other_count,
-				slashable_balance_of.get(&s.0).unwrap().ctrl,
+				staker_infos.get(&s.0).unwrap().ctrl,
 			);
 			assert_eq!(support.total, support.own + others_sum);
 			if support.total < slot_stake { slot_stake = support.total; }
@@ -362,7 +374,7 @@ fn main() {
 		println!("\n######################################\n +++ Updated Assignments:");
 		let mut counter = 1;
 		for (nominator, info) in nominator_info.iter() {
-			let staker_info = slashable_balance_of.get(&nominator).unwrap();
+			let staker_info = staker_infos.get(&nominator).unwrap();
 			let mut sum = 0;
 			println!("#{} {:?} // active_stake = {}", counter, nominator, KSM(staker_info.ledger.active));
 			println!("  Distributions:");
@@ -374,7 +386,7 @@ fn main() {
 			assert!(sum.max(staker_info.ledger.active) - sum.min(staker_info.ledger.active) < 10);
 			println!("");
 		}
-		println!("\nSLOT_STAKE {}", KSM(slot_stake));
+		println!("\n++ final slot_stake {}", KSM(slot_stake));
 		futures::future::ok::<(), ()>(())
 	}))
 }
