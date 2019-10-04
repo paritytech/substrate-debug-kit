@@ -332,15 +332,15 @@ fn main() {
 			slashable_balance,
 		);
 
-		println!("######################################\n +++ Original Assignments (with equalize, this is not outdated.):");
-		assignments.iter().enumerate().for_each(|(i, (n, assignment_vec))| {
-			let staker_info = staker_infos.get(&n).unwrap();
-			println!("#{} {:?} // active_stake = {}", i, n, KSM(staker_info.ledger.active));
-			println!("  Distributions:");
-			assignment_vec.iter().enumerate().for_each(|(i, (c, p))| {
-				println!("	#{} {:?} => {} [{:?}]", i, c, KSM(*p * staker_info.ledger.active), p);
-			});
-		});
+		// println!("######################################\n +++ Original Assignments (with equalize, this is outdated):");
+		// assignments.iter().enumerate().for_each(|(i, (n, assignment_vec))| {
+		// 	let staker_info = staker_infos.get(&n).unwrap();
+		// 	println!("#{} {:?} // active_stake = {}", i, n, KSM(staker_info.ledger.active));
+		// 	println!("  Distributions:");
+		// 	assignment_vec.iter().enumerate().for_each(|(i, (c, p))| {
+		// 		println!("	#{} {:?} => {} [{:?}]", i, c, KSM(*p * staker_info.ledger.active), p);
+		// 	});
+		// });
 
 		let mut slot_stake = u128::max_value();
 		let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
