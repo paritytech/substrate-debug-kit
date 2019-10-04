@@ -1,0 +1,23 @@
+[package]
+name = "node-rpc-client"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+
+[dependencies]
+hex = "0.4.0"
+log = "0.4"
+url = "1.7.2"
+env_logger = "0.6"
+futures = "0.1.29"
+hyper = "0.12"
+separator = "0.3.1"
+codec = { package = "parity-scale-codec", version = "1.0.5", default-features = false, features = ["derive"] }
+jsonrpc-core-client = { version = "13.2.0", features = ["http", "ws", "tls"] }
+node-primitives = { path = "../substrate/node/primitives", version = "2.0.0" }
+substrate-rpc = { path = "../substrate/core/rpc", version = "2.0.0" }
+substrate-phragmen = { path = "../substrate/core/phragmen", version = "2.0.0" }
+substrate-primitives = { path = "../substrate/core/primitives", version = "2.0.0" }
+sr-primitives = { path = "../substrate/core/sr-primitives", version = "2.0.0" }
+support = { package = "srml-support", path = "../substrate/srml/support" }
+staking = { package = "srml-staking", path = "../substrate/srml/staking" }
