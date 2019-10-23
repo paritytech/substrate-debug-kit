@@ -1,8 +1,8 @@
 {
-  "validator_count":98,
-  "nominator_count":60,
-  "total_issuance":7180985914971056000,
-  "elected_winners":[
+  "validator_count":99,
+  "nominator_count":61,
+  "total_issuance":7180985914757456000,
+  "candidates":[
     {
       "rank":1,
       "pub_key_stash":"5DwXnSMVwLXBZoEfJDw9LMXAb1Q4pv1yp8DrFzNWqAzuJHPo",
@@ -839,6 +839,21 @@
     },
     {
       "rank":50,
+      "pub_key_stash":"5EUoUyhJ3ZZwwP56S3KWfz2YqEmmAUDQB7dmvxGn7k9ZM9jR",
+      "stake_total":18000000000000,
+      "stake_validator":9000000000000,
+      "other_stake_sum":9000000000000,
+      "other_stake_count":1,
+      "pub_key_controller":"5EUoUyhJ3ZZwwP56S3KWfz2YqEmmAUDQB7dmvxGn7k9ZM9jR",
+      "voters":[
+        {
+          "stake_nominator":9000000000000,
+          "pub_key_nominator":"5DXTeoucQx112N7ru3vRfern7YVXorggBgVxpugN2RRF9dai"
+        }
+      ]
+    },
+    {
+      "rank":51,
       "pub_key_stash":"5Gumqidmdm3dNFTN8hAA2FtQsuomPXpyBNKSKCBrUtWtemYp",
       "stake_total":15000000000000,
       "stake_validator":10000000000000,
@@ -853,7 +868,19 @@
       ]
     },
     {
-      "rank":51,
+      "rank":52,
+      "pub_key_stash":"5DFG7GbJu6BrVkt4EAgnMjyDGZosdTd7uxKU4VJLZJ8MqpLh",
+      "stake_total":9900000000000,
+      "stake_validator":9900000000000,
+      "other_stake_sum":0,
+      "other_stake_count":0,
+      "pub_key_controller":"5DFG7GbJu6BrVkt4EAgnMjyDGZosdTd7uxKU4VJLZJ8MqpLh",
+      "voters":[
+
+      ]
+    },
+    {
+      "rank":53,
       "pub_key_stash":"5FxNm6488Fu42dsJTatpVDtpB3Qq4VmS3433EUebBbbxccZg",
       "stake_total":9500000000000,
       "stake_validator":9500000000000,
@@ -865,19 +892,7 @@
       ]
     },
     {
-      "rank":52,
-      "pub_key_stash":"5EUoUyhJ3ZZwwP56S3KWfz2YqEmmAUDQB7dmvxGn7k9ZM9jR",
-      "stake_total":9000000000000,
-      "stake_validator":9000000000000,
-      "other_stake_sum":0,
-      "other_stake_count":0,
-      "pub_key_controller":"5EUoUyhJ3ZZwwP56S3KWfz2YqEmmAUDQB7dmvxGn7k9ZM9jR",
-      "voters":[
-
-      ]
-    },
-    {
-      "rank":53,
+      "rank":54,
       "pub_key_stash":"5CJEKYvixc2xHkJFkyRiNLwqm7GK28KDNy7B7MEv19Ccb4nL",
       "stake_total":9000000000000,
       "stake_validator":9000000000000,
@@ -889,7 +904,7 @@
       ]
     },
     {
-      "rank":54,
+      "rank":55,
       "pub_key_stash":"5CJocg7ANgF7XxC7kfnBMEmEAWrnS9eaQVURZD161KKCV7BD",
       "stake_total":9000000000000,
       "stake_validator":9000000000000,
@@ -901,7 +916,7 @@
       ]
     },
     {
-      "rank":55,
+      "rank":56,
       "pub_key_stash":"5ENgPycQusCznrbrPvxSAkBpJzz7VXx4EQVSkKthd6s5ER9c",
       "stake_total":11950000000000,
       "stake_validator":100000000000,
@@ -916,7 +931,7 @@
       ]
     },
     {
-      "rank":56,
+      "rank":57,
       "pub_key_stash":"5CdEXNFVV1VeK6L4oNmc1s22i9Wrusz6w68CuoohBErtjLUD",
       "stake_total":8000000000000,
       "stake_validator":8000000000000,
@@ -928,7 +943,7 @@
       ]
     },
     {
-      "rank":57,
+      "rank":58,
       "pub_key_stash":"5Cca1YdhiiwSLNfTYn1HR8dbQeCCPDLvebYQ9yMSyXKDQoG4",
       "stake_total":8000000000000,
       "stake_validator":8000000000000,
@@ -940,7 +955,7 @@
       ]
     },
     {
-      "rank":58,
+      "rank":59,
       "pub_key_stash":"5Fsko6FqGf2Q2sV1DCdmPxnrYSSnYQrNr6BHp828y8mh8mvf",
       "stake_total":8000000000000,
       "stake_validator":8000000000000,
@@ -952,7 +967,7 @@
       ]
     },
     {
-      "rank":59,
+      "rank":60,
       "pub_key_stash":"5CMNcDpfvRfzD9be3a91aeaLiRwX1HzAFxTsk6TbscmjAhnP",
       "stake_total":8000000000000,
       "stake_validator":8000000000000,
@@ -964,7 +979,7 @@
       ]
     },
     {
-      "rank":60,
+      "rank":61,
       "pub_key_stash":"5HYoxYNx3HULtRjqhy6qkbUDUh5Wd5XjR4pUym3cYxBY6KaG",
       "stake_total":5000000000000,
       "stake_validator":5000000000000,
@@ -976,7 +991,7 @@
       ]
     },
     {
-      "rank":61,
+      "rank":62,
       "pub_key_stash":"5Dk7dKdx7mwQuPzASXSLgMtWM2PLxcKbNYpjFs1xwibwSjtL",
       "stake_total":1105000000001,
       "stake_validator":102000000001,
@@ -991,7 +1006,7 @@
       ]
     },
     {
-      "rank":62,
+      "rank":63,
       "pub_key_stash":"5E9hMoXeVnCtq2PbgVS1oHhr7xixyXTi6C63kQ1brfpmfsAF",
       "stake_total":1000000000000,
       "stake_validator":1000000000000,
@@ -1003,7 +1018,7 @@
       ]
     },
     {
-      "rank":63,
+      "rank":64,
       "pub_key_stash":"5Fuc4MRYdoijtwZtzCfEQpJXpSJmvp17RCEkc42GHgJu8Nw7",
       "stake_total":1000000000000,
       "stake_validator":1000000000000,
@@ -1015,7 +1030,7 @@
       ]
     },
     {
-      "rank":64,
+      "rank":65,
       "pub_key_stash":"5EP74qEQQjV5d5v4piJtH8N3rcVS2AMmfqDjfcvMDgm8hBFq",
       "stake_total":1000000000000,
       "stake_validator":1000000000000,
@@ -1027,7 +1042,7 @@
       ]
     },
     {
-      "rank":65,
+      "rank":66,
       "pub_key_stash":"5GxFAGtZPkaucGPH2hTEvowb3QfVuRftmH4n5zu4D5LakZE6",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1039,7 +1054,7 @@
       ]
     },
     {
-      "rank":66,
+      "rank":67,
       "pub_key_stash":"5Cjy3um4pebeeW5fsdwrvk8Qh1hhhfBNHPFB3D5jGFpmhacS",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1051,7 +1066,7 @@
       ]
     },
     {
-      "rank":67,
+      "rank":68,
       "pub_key_stash":"5E3WEsCEvynmqGgj8yvQYX8VHZu6ruovf4Fg1znrjqq7kAzr",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1063,7 +1078,7 @@
       ]
     },
     {
-      "rank":68,
+      "rank":69,
       "pub_key_stash":"5DYTTDESyN23hXD2fGKKAXYzdPd1d5oTWB2LipeVChdcZ2pN",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1075,7 +1090,7 @@
       ]
     },
     {
-      "rank":69,
+      "rank":70,
       "pub_key_stash":"5DDAK3VZ3Vmv9ybtixGR4Cz3JXEnEiWjnqyNgYwK6o2pcWwL",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1087,7 +1102,7 @@
       ]
     },
     {
-      "rank":70,
+      "rank":71,
       "pub_key_stash":"5EYj9J8jF2qgSV93p7FtpWKDSAiYFHSo5QpA9Z1U6VkHqyk2",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1099,7 +1114,7 @@
       ]
     },
     {
-      "rank":71,
+      "rank":72,
       "pub_key_stash":"5HKeKm5JzdfxaCTxVt74KJCwJMZyjHWYt8mPh75GEqH8vfca",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1111,7 +1126,7 @@
       ]
     },
     {
-      "rank":72,
+      "rank":73,
       "pub_key_stash":"5Hmqs1bfZLQdZra4H5nr3wJDz3PBQsPFdhmZ9FNQDsnWzugY",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1123,7 +1138,7 @@
       ]
     },
     {
-      "rank":73,
+      "rank":74,
       "pub_key_stash":"5Dt33JQ9Wa7jymjm4rESfCkXgLzQvA6K1gPi4He9nx2aSbCX",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1135,7 +1150,7 @@
       ]
     },
     {
-      "rank":74,
+      "rank":75,
       "pub_key_stash":"5EefKy9p4au5emxJW2zi7JSbsUTkkmC1qtmm6LaK9humENQ8",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1147,7 +1162,7 @@
       ]
     },
     {
-      "rank":75,
+      "rank":76,
       "pub_key_stash":"5CDAiU3pyhZLVkmfUotRvqJw3nfHZNngAQMfchUdWxfPsEgS",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1159,7 +1174,7 @@
       ]
     },
     {
-      "rank":76,
+      "rank":77,
       "pub_key_stash":"5Eg6xNrC3iGG1ygm8LqYjCrWG1eVnhJ9BRncvqubLY3CDBVT",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1171,7 +1186,7 @@
       ]
     },
     {
-      "rank":77,
+      "rank":78,
       "pub_key_stash":"5HAtrTpecuhq6jfmFZ3WCF4jxjWJppQbfcfEayrkMTArrxPe",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1183,7 +1198,7 @@
       ]
     },
     {
-      "rank":78,
+      "rank":79,
       "pub_key_stash":"5EcmoFw2w3n9v2bjVCtKtkG5WJyUcNW9wzWkJsw7hqgtb1Aa",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1195,7 +1210,7 @@
       ]
     },
     {
-      "rank":79,
+      "rank":80,
       "pub_key_stash":"5FBE5SX6WjpKbAcPcs4qV3KagjFUhK3eY5zTgRWgsqHdeFrm",
       "stake_total":999754000000,
       "stake_validator":999754000000,
@@ -1207,7 +1222,7 @@
       ]
     },
     {
-      "rank":80,
+      "rank":81,
       "pub_key_stash":"5Ec6unZrFrjrVRUFVhyQVwpdgf4oyo2du1J4FrQmzGU1yn2c",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1219,7 +1234,7 @@
       ]
     },
     {
-      "rank":81,
+      "rank":82,
       "pub_key_stash":"5G6UtNKipw5tnsoVwtHir5xoaMWNY6FTDFmcf8fJG8TDJrM3",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1231,7 +1246,7 @@
       ]
     },
     {
-      "rank":82,
+      "rank":83,
       "pub_key_stash":"5EqqYbrPWUxaqmt9L3KL17RJc9Giyp195haF3rPeQDSoXogi",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1243,7 +1258,7 @@
       ]
     },
     {
-      "rank":83,
+      "rank":84,
       "pub_key_stash":"5Hphx5QDSfTY8krY63Jhm276nEszvQVMXqLB1y7zhCzoioTT",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1255,7 +1270,7 @@
       ]
     },
     {
-      "rank":84,
+      "rank":85,
       "pub_key_stash":"5EU6vxXJGXwtcXwExf9KZDVscNUPRaSRVJroXFJcW8gf7mCJ",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1267,7 +1282,7 @@
       ]
     },
     {
-      "rank":85,
+      "rank":86,
       "pub_key_stash":"5G9udv5VwHTbwTGNrZ8hyEnxuSbS5q5XgwBR88cdNWRrJc5n",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1279,7 +1294,7 @@
       ]
     },
     {
-      "rank":86,
+      "rank":87,
       "pub_key_stash":"5F4xziVpKXZLA7HghReaLSRUUUcsUivudEnps4qN7RwcCjzd",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1291,7 +1306,7 @@
       ]
     },
     {
-      "rank":87,
+      "rank":88,
       "pub_key_stash":"5DWwfTeVNDiukUDgxpgPT7ryet2EpZbTB9Y1PaTqz9WYEymL",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1303,7 +1318,7 @@
       ]
     },
     {
-      "rank":88,
+      "rank":89,
       "pub_key_stash":"5FCZcyG5bMV48GxdmUg4EatVKthWkkrE6KuDb7dB1jZy6HGL",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1315,7 +1330,7 @@
       ]
     },
     {
-      "rank":89,
+      "rank":90,
       "pub_key_stash":"5EZMCPQeF91ThBjk8UYSQJs3BpgscMkLLfTPES3HPRnJ7GKk",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1327,7 +1342,7 @@
       ]
     },
     {
-      "rank":90,
+      "rank":91,
       "pub_key_stash":"5FLiSXf4WE9KgSY23u8J6HYAKZ9xyVX2dTWykuGJW5tW11Y3",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1339,7 +1354,7 @@
       ]
     },
     {
-      "rank":91,
+      "rank":92,
       "pub_key_stash":"5H8hvFC6wkqTfBJFLcsGtdgj7XVsgWSDPjYW4bGfcmC6pJTn",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1351,7 +1366,7 @@
       ]
     },
     {
-      "rank":92,
+      "rank":93,
       "pub_key_stash":"5H1D4JmNtEtEMd8vFHAhxbUSVWLJFJnJ89D5rBvrEv2ii1DC",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1363,7 +1378,7 @@
       ]
     },
     {
-      "rank":93,
+      "rank":94,
       "pub_key_stash":"5ENU8KkPoVVdFTKM46jatJmRGsrntL21G4aug3BczFLK3oo3",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1375,7 +1390,7 @@
       ]
     },
     {
-      "rank":94,
+      "rank":95,
       "pub_key_stash":"5Guk3DgLG8LtHKfzwwWswBB86gtTcf35oynLy98gZv9cATkk",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1387,7 +1402,7 @@
       ]
     },
     {
-      "rank":95,
+      "rank":96,
       "pub_key_stash":"5FxW6cfgurJgxLBG5TazppMXyGnS58q4kYquBooaGfVeR9e8",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1399,7 +1414,7 @@
       ]
     },
     {
-      "rank":96,
+      "rank":97,
       "pub_key_stash":"5EsohptnyqSxC6c5u9wturYefYdTgdcjubAxQ2u6ontYrdRW",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1411,7 +1426,7 @@
       ]
     },
     {
-      "rank":97,
+      "rank":98,
       "pub_key_stash":"5FTRCZCLBSvUSF5om8XBC8Hh1wsDHehRpLXT1WhRjQYB5W4q",
       "stake_total":500000000000,
       "stake_validator":500000000000,
@@ -1423,7 +1438,7 @@
       ]
     },
     {
-      "rank":98,
+      "rank":99,
       "pub_key_stash":"5FhW1wdrFG3x3vPX7EQqpDmDSResATYNYc25Mf3DRL8YKsSz",
       "stake_total":1000000000,
       "stake_validator":1000000000,
@@ -1435,5 +1450,5 @@
       ]
     }
   ],
-  "final_slot_stake":"1000000000"
+  "final_slot_stake":"11950000000000"
 }
