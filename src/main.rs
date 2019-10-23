@@ -22,9 +22,8 @@
 
 use futures::Future;
 use hyper::rt;
-use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
+use std::{fmt::Debug, collections::BTreeMap};
 use codec::Decode;
-use separator::Separatable;
 
 use substrate_rpc::state::StateClient;
 use jsonrpc_core_client::transports::{http};
@@ -37,26 +36,11 @@ use substrate_primitives::hashing::{blake2_256, twox_128};
 use substrate_phragmen::{elect, equalize, PhragmenResult, PhragmenStakedAssignment, Support, SupportMap};
 use staking::{StakingLedger, ValidatorPrefs};
 
-// TODO: clean function interfaces: probably no more passing string.
-// TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
-// TODO: read number of candidates and minimum from the chain.
-// TODO: allow tweaking some parameters from cli?
-
 /// A staker
 #[derive(Debug)]
 struct Staker {
 	ctrl: AccountId,
 	ledger: StakingLedger<AccountId, Balance>,
-}
-
-/// Wrapper to pretty-print ksm (or any other 12 decimal) token.
-struct KSM(Balance);
-
-impl fmt::Display for KSM {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let num: u64 = self.0.try_into().unwrap();
-		write!(f, "{}", num.separated_string())
-	}
 }
 
 // Total issuance.
@@ -183,17 +167,9 @@ mod network {
 
 fn main() {
 	rt::run(rt::lazy(|| {
-		// WILL NOT WORK. to connect to a remote node. Yet, the ws client is not being properly
-		// created and there is no way to pass SSL cert. stuff.
-		// let uri = "wss://canary-5.kusama.network/";
-		// let URL = url::Url::parse(uri).unwrap();
-		// let client: StateClient<Hash> = ws::connect(&URL).wait().unwrap();
-
 		// connect to a local node.
 		let uri = "http://localhost:9933";
 		let client: StateClient<Hash> = http::connect(uri).wait().unwrap();
-
-		println!("++ connected to [{}]", uri);
 
 		// stash key of all wannabe candidates.
 		let validators = storage::enumerate_linked_map::<
@@ -215,8 +191,9 @@ fn main() {
 			&client,
 		);
 
-		println!("++ validator count {:?}", validators.len());
-		println!("++ nominator count {:?}", nominators.len());
+		println!("{{");
+		println!("  \"validator_count\": {:?},", validators.len());
+		println!("  \"nominator_count\": {:?},", nominators.len());
 
 		// get the slashable balance of every entity
 		let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
@@ -251,7 +228,7 @@ fn main() {
 			&client,
 		).unwrap();
 
-		println!("++ total_issuance = {}", total_issuance);
+		println!("  \"total_issuance\": {},", total_issuance);
 		unsafe { ISSUANCE = &mut total_issuance; }
 
 		struct TotalIssuance;
@@ -332,61 +309,52 @@ fn main() {
 			slashable_balance,
 		);
 
-		// println!("######################################\n +++ Original Assignments (with equalize, this is outdated):");
-		// assignments.iter().enumerate().for_each(|(i, (n, assignment_vec))| {
-		// 	let staker_info = staker_infos.get(&n).unwrap();
-		// 	println!("#{} {:?} // active_stake = {}", i, n, KSM(staker_info.ledger.active));
-		// 	println!("  Distributions:");
-		// 	assignment_vec.iter().enumerate().for_each(|(i, (c, p))| {
-		// 		println!("	#{} {:?} => {} [{:?}]", i, c, KSM(*p * staker_info.ledger.active), p);
-		// 	});
-		// });
-
 		let mut slot_stake = u128::max_value();
-		let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
+		let nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
 
-		println!("\n######################################\n +++ Winner Validators:");
+		println!("  \"elected_winners\":");
+		println!("  [");
 		winners.iter().enumerate().for_each(|(i, s)| {
-			println!("#{} == {:?}", i + 1, s.0);
+			if i > 0 { println!("    ,"); }
+			println!("    {{");
+			println!("      \"rank\": {},", i + 1);
+			println!("      \"pub_key_stash\": \"{}\",", staker_infos.get(&s.0).unwrap().ledger.stash);
 			let support = supports.get(&s.0).unwrap();
 			let others_sum: Balance = support.others.iter().map(|(_n, s)| s).sum();
 			let other_count = support.others.len();
-			println!(
-				"  [stake_total: {}] [stake_own: {} ({}%)] [other_stake_sum: {} ({}%)] [other_stake_count: {}] [ctrl: {:?}]",
-				KSM(support.total),
-				KSM(support.own),
-				support.own * 100 / support.total,
-				KSM(others_sum),
-				others_sum * 100 / support.total,
-				other_count,
-				staker_infos.get(&s.0).unwrap().ctrl,
-			);
+
+			println!("      \"stake_total\": {},", support.total);
+			println!("      \"stake_validator\": {},", support.own);
+			println!("      \"other_stake_sum\": {},", others_sum);
+			println!("      \"other_stake_count\": {},", other_count);
+			println!("      \"pub_key_controller\": \"{}\",", staker_infos.get(&s.0).unwrap().ctrl);
+			println!("      \"voters\":");
+			println!("      [");
+
 			assert_eq!(support.total, support.own + others_sum);
 			if support.total < slot_stake { slot_stake = support.total; }
-			println!("  Voters:");
-			support.others.iter().enumerate().for_each(|(i, o)| {
-				println!("	#{} [amount = {}] {:?}", i, KSM(o.1), o.0);
-
-				nominator_info.entry(o.0.clone()).or_insert(vec![]).push((s.0.clone(), o.1));
+			support.others.iter().enumerate().for_each(|(j, o)| {
+				if j > 0 { println!("        ,"); }
+				println!("        {{");
+				println!("          \"stake_nominator\": {},", o.1);
+				println!("          \"pub_key_nominator\": \"{}\"", o.0);
+				println!("        }}");
 			});
+			println!("      ]");
+			println!("    }}");
 		});
+		println!("  ],");
 
-		println!("\n######################################\n +++ Updated Assignments:");
-		let mut counter = 1;
 		for (nominator, info) in nominator_info.iter() {
 			let staker_info = staker_infos.get(&nominator).unwrap();
 			let mut sum = 0;
-			println!("#{} {:?} // active_stake = {}", counter, nominator, KSM(staker_info.ledger.active));
-			println!("  Distributions:");
-			info.iter().enumerate().for_each(|(i, (c, s))| {
+			info.iter().enumerate().for_each(|(_i, (_c, s))| {
 				sum += *s;
-				println!("    #{} {:?} => {}", i, c, KSM(*s));
 			});
-			counter += 1;
 			assert!(sum.max(staker_info.ledger.active) - sum.min(staker_info.ledger.active) < 10);
-			println!("");
 		}
-		println!("\n++ final slot_stake {}", KSM(slot_stake));
+		println!("  \"final_slot_stake\": \"{}\"", slot_stake);
+		println!("}}");
 		futures::future::ok::<(), ()>(())
 	}))
 }
