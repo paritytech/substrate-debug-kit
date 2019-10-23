@@ -141,6 +141,7 @@ mod network {
 	pub const TOLERANCE: u128 = 0_u128;
 	pub const ITERATIONS: usize = 2_usize;
 
+	pub const LIMIT: usize = 999;
 	pub const VALIDATOR_COUNT: usize = 50;
 	pub const MIN_VALIDATOR_COUNT: usize = 10;
 
@@ -247,7 +248,7 @@ fn main() {
 			_,
 			network::CurrencyToVoteHandler<TotalIssuance>
 		>(
-			network::VALIDATOR_COUNT,
+			network::LIMIT,
 			network::MIN_VALIDATOR_COUNT,
 			validators.clone(),
 			nominators.clone(),
@@ -312,7 +313,7 @@ fn main() {
 		let mut slot_stake = u128::max_value();
 		let nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
 
-		println!("  \"elected_winners\":");
+		println!("  \"candidates\":");
 		println!("  [");
 		winners.iter().enumerate().for_each(|(i, s)| {
 			if i > 0 { println!("    ,"); }
@@ -332,7 +333,7 @@ fn main() {
 			println!("      [");
 
 			assert_eq!(support.total, support.own + others_sum);
-			if support.total < slot_stake { slot_stake = support.total; }
+			if support.total < slot_stake && i < network::VALIDATOR_COUNT { slot_stake = support.total; }
 			support.others.iter().enumerate().for_each(|(j, o)| {
 				if j > 0 { println!("        ,"); }
 				println!("        {{");
