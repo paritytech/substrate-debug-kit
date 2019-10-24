@@ -26,21 +26,25 @@ use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
 use codec::Decode;
 use separator::Separatable;
 
-use substrate_rpc::state::StateClient;
 use jsonrpc_core_client::transports::{http};
+use substrate_rpc_api::state::StateClient;
 
-use node_primitives::{Hash, Balance, AccountId};
-use support::storage::generator::Linkage;
-use sr_primitives::traits::Convert;
+
+use polkadot_primitives::{Hash, Balance, AccountId};
 use substrate_primitives::storage::StorageKey;
 use substrate_primitives::hashing::{blake2_256, twox_128};
 use substrate_phragmen::{elect, equalize, PhragmenResult, PhragmenStakedAssignment, Support, SupportMap};
+use sr_primitives::traits::Convert;
+use support::storage::generator::Linkage;
 use staking::{StakingLedger, ValidatorPrefs};
 
 // TODO: clean function interfaces: probably no more passing string.
+// TODO: show address in valid kusama format.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
 // TODO: read number of candidates and minimum from the chain.
 // TODO: allow tweaking some parameters from cli?
+
+type Client = StateClient<Hash>;
 
 /// A staker
 #[derive(Debug)]
@@ -51,6 +55,15 @@ struct Staker {
 
 /// Wrapper to pretty-print ksm (or any other 12 decimal) token.
 struct KSM(Balance);
+
+const DECIMAL_POINTS: Balance = 1_000_000_000_000;
+
+impl fmt::Debug for KSM {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let num: u64 = self.0.try_into().unwrap();
+		write!(f, "{}_KSM ({})", self.0 / DECIMAL_POINTS, num.separated_string())
+	}
+}
 
 impl fmt::Display for KSM {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -91,12 +104,12 @@ mod keys {
 
 /// Some helpers to read storage.
 mod storage {
-	use super::{Hash, StateClient, StorageKey, Future, Decode, Debug, Linkage};
+	use super::{StorageKey, Future, Decode, Debug, Linkage, Client};
 	use super::storage;
 	use super::keys;
 
 	/// Read from a raw key regardless of the type.
-	pub fn read<T: Decode>(key: StorageKey, client: &StateClient<Hash>) -> Option<T> {
+	pub fn read<T: Decode>(key: StorageKey, client: &Client) -> Option<T> {
 		let encoded = client.storage(key, None).wait().unwrap().map(|d| d.0)?;
 		<T as Decode>::decode(&mut encoded.as_slice()).ok()
 	}
@@ -106,7 +119,7 @@ mod storage {
 	pub fn enumerate_linked_map<K, T>(
 		module: String,
 		storage: String,
-		client: &StateClient<Hash>
+		client: &Client
 	) -> Vec<(K, T)>
 		where K: Decode + Debug + Clone + AsRef<[u8]>, T: Decode + Clone + Debug,
 	{
@@ -187,11 +200,11 @@ fn main() {
 		// created and there is no way to pass SSL cert. stuff.
 		// let uri = "wss://canary-5.kusama.network/";
 		// let URL = url::Url::parse(uri).unwrap();
-		// let client: StateClient<Hash> = ws::connect(&URL).wait().unwrap();
+		// let client: Client<Hash> = ws::connect(&URL).wait().unwrap();
 
 		// connect to a local node.
 		let uri = "http://localhost:9933";
-		let client: StateClient<Hash> = http::connect(uri).wait().unwrap();
+		let client: Client = http::connect(uri).wait().unwrap();
 
 		println!("++ connected to [{}]", uri);
 
@@ -332,16 +345,6 @@ fn main() {
 			slashable_balance,
 		);
 
-		// println!("######################################\n +++ Original Assignments (with equalize, this is outdated):");
-		// assignments.iter().enumerate().for_each(|(i, (n, assignment_vec))| {
-		// 	let staker_info = staker_infos.get(&n).unwrap();
-		// 	println!("#{} {:?} // active_stake = {}", i, n, KSM(staker_info.ledger.active));
-		// 	println!("  Distributions:");
-		// 	assignment_vec.iter().enumerate().for_each(|(i, (c, p))| {
-		// 		println!("	#{} {:?} => {} [{:?}]", i, c, KSM(*p * staker_info.ledger.active), p);
-		// 	});
-		// });
-
 		let mut slot_stake = u128::max_value();
 		let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
 
@@ -352,7 +355,7 @@ fn main() {
 			let others_sum: Balance = support.others.iter().map(|(_n, s)| s).sum();
 			let other_count = support.others.len();
 			println!(
-				"  [stake_total: {}] [stake_own: {} ({}%)] [other_stake_sum: {} ({}%)] [other_stake_count: {}] [ctrl: {:?}]",
+				"  [stake_total: {:?}] [stake_own: {:?} ({}%)] [other_stake_sum: {:?} ({}%)] [other_stake_count: {}] [ctrl: {:?}]",
 				KSM(support.total),
 				KSM(support.own),
 				support.own * 100 / support.total,
@@ -376,14 +379,16 @@ fn main() {
 		for (nominator, info) in nominator_info.iter() {
 			let staker_info = staker_infos.get(&nominator).unwrap();
 			let mut sum = 0;
-			println!("#{} {:?} // active_stake = {}", counter, nominator, KSM(staker_info.ledger.active));
+			println!("#{} {:?} // active_stake = {:?}", counter, nominator, KSM(staker_info.ledger.active));
 			println!("  Distributions:");
 			info.iter().enumerate().for_each(|(i, (c, s))| {
 				sum += *s;
-				println!("    #{} {:?} => {}", i, c, KSM(*s));
+				println!("    #{} {:?} => {:?}", i, c, KSM(*s));
 			});
 			counter += 1;
-			assert!(sum.max(staker_info.ledger.active) - sum.min(staker_info.ledger.active) < 10);
+			let diff = sum.max(staker_info.ledger.active) - sum.min(staker_info.ledger.active);
+			// acceptable diff is one millionth of a KSM
+			assert!(diff < 1_000, "diff{ sum_nominations,  staker_info.ledger.active} = ");
 			println!("");
 		}
 		println!("\n++ final slot_stake {}", KSM(slot_stake));

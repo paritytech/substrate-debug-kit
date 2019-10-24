@@ -12,8 +12,8 @@ separator = "0.4.1"
 codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
 jsonrpc-core-client = { version = "13.2.0", features = ["http", "ws", "tls"] }
 
-node-primitives = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-substrate-rpc = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "v0.6" }
+substrate-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
 substrate-phragmen = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
 substrate-primitives = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
 sr-primitives = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
