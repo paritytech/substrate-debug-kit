@@ -368,7 +368,7 @@ fn main() {
 			if support.total < slot_stake { slot_stake = support.total; }
 			println!("  Voters:");
 			support.others.iter().enumerate().for_each(|(i, o)| {
-				println!("	#{} [amount = {}] {:?}", i, KSM(o.1), o.0);
+				println!("	#{} [amount = {:?}] {:?}", i, KSM(o.1), o);
 
 				nominator_info.entry(o.0.clone()).or_insert(vec![]).push((s.0.clone(), o.1));
 			});
