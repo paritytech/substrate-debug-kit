@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-#![warn(missing_docs)]
-#![warn(unused_extern_crates)]
-
 //! An extended version of the code in `substrate/node/rpc-client/` which reads the staking info
 //! of a chain and runs the phragmen election with the given parameters offline.
+
+#![warn(missing_docs)]
+#![warn(unused_extern_crates)]
 
 use futures::Future;
 use hyper::rt;
 use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
 use codec::Decode;
 use separator::Separatable;
-
+use clap::{Arg, App};
 use jsonrpc_core_client::transports::{http};
 use substrate_rpc_api::state::StateClient;
 
@@ -42,7 +42,6 @@ use staking::{StakingLedger, ValidatorPrefs};
 // TODO: show address in valid kusama format.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
 // TODO: read number of candidates and minimum from the chain.
-// TODO: allow tweaking some parameters from cli?
 
 type Client = StateClient<Hash>;
 
@@ -170,9 +169,6 @@ mod network {
 	pub const TOLERANCE: u128 = 0_u128;
 	pub const ITERATIONS: usize = 2_usize;
 
-	pub const VALIDATOR_COUNT: usize = 50;
-	pub const MIN_VALIDATOR_COUNT: usize = 10;
-
 	/// a way to attach the total issuance to `CurrencyToVoteHandler`.
 	pub trait GetTotalIssuance {
 		fn get_total_issuance() -> Balance;
@@ -206,7 +202,61 @@ fn main() {
 		let uri = "http://localhost:9933";
 		let client: Client = http::connect(uri).wait().unwrap();
 
-		println!("++ connected to [{}]", uri);
+
+		let matches = App::new("offline-phragmen")
+			.version("0.1")
+			.author("Kian Paimani <kian@parity.io>")
+			.about("Runs the phragmen election algorithm of any substrate chain with staking module offline (aka. off the chain) and predicts the results.")
+			.arg(Arg::with_name("count")
+				.short("c")
+				.long("count")
+				.value_name("VALIDATOR_COUNT")
+				.help("count of validators to elect. Should be equal to chain.staking.validatorCount. Default is 50.")
+				.takes_value(true)
+			).arg(Arg::with_name("network")
+				.short("n")
+				.long("network")
+				.value_name("NETWORK")
+				.help("network address format. Can be kusama|polkadot|substrate. Default is kusama.")
+				.takes_value(true)
+			).arg(Arg::with_name("output")
+				.short("o")
+				.long("output")
+				.value_name("FILE")
+				.help("Json output file name. dumps the results into if given.")
+				.takes_value(true)
+			).arg(Arg::with_name("min-count")
+				.short("m")
+				.long("min-count")
+				.value_name("MIN_VALIDATOR_COUNT")
+				.help("minimum number of validators to elect. If less candidates are available, phragmen will go south. Should be equal to chain.staking.minimumValidatorCount. Default is 10.")
+				.takes_value(true)
+			).get_matches();
+
+		let validator_count = matches.value_of("count")
+			.unwrap_or("50")
+			.parse()
+			.unwrap_or(50);
+		let minimum_validator_count = matches.value_of("min-count")
+			.unwrap_or("10")
+			.parse()
+			.unwrap_or(10);
+
+		// setup address format
+		let addr_format = match matches.value_of("network").unwrap_or("kusama") {
+			"kusama" => Ss58AddressFormat::KusamaAccountDirect,
+			"polkadot" => Ss58AddressFormat::PolkadotAccountDirect,
+			"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
+			_ => panic!("invalid address format"),
+		};
+		use substrate_primitives::crypto::{set_default_ss58_version, Ss58AddressFormat};
+		set_default_ss58_version(addr_format);
+
+		// chose json output file
+		let output_file = matches.value_of("output");
+		if output_file.is_some() {
+			panic!("output to json not implemented.");
+		}
 
 		// stash key of all wannabe candidates.
 		let validators = storage::enumerate_linked_map::<
@@ -227,9 +277,6 @@ fn main() {
 			"Nominators".to_string(),
 			&client,
 		);
-
-		println!("++ validator count {:?}", validators.len());
-		println!("++ nominator count {:?}", nominators.len());
 
 		// get the slashable balance of every entity
 		let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
@@ -263,8 +310,6 @@ fn main() {
 			),
 			&client,
 		).unwrap();
-
-		println!("++ total_issuance = {}", total_issuance);
 		unsafe { ISSUANCE = &mut total_issuance; }
 
 		struct TotalIssuance;
@@ -283,8 +328,8 @@ fn main() {
 			_,
 			network::CurrencyToVoteHandler<TotalIssuance>
 		>(
-			network::VALIDATOR_COUNT,
-			network::MIN_VALIDATOR_COUNT,
+			validator_count,
+			minimum_validator_count,
 			validators.clone(),
 			nominators.clone(),
 			slashable_balance,
@@ -348,7 +393,7 @@ fn main() {
 		let mut slot_stake = u128::max_value();
 		let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
 
-		println!("\n######################################\n +++ Winner Validators:");
+		println!("\n######################################\n+++ Winner Validators:");
 		winners.iter().enumerate().for_each(|(i, s)| {
 			println!("#{} == {:?}", i + 1, s.0);
 			let support = supports.get(&s.0).unwrap();
@@ -374,7 +419,7 @@ fn main() {
 			});
 		});
 
-		println!("\n######################################\n +++ Updated Assignments:");
+		println!("\n######################################\n+++ Updated Assignments:");
 		let mut counter = 1;
 		for (nominator, info) in nominator_info.iter() {
 			let staker_info = staker_infos.get(&nominator).unwrap();
@@ -391,7 +436,14 @@ fn main() {
 			assert!(diff < 1_000, "diff{ sum_nominations,  staker_info.ledger.active} = ");
 			println!("");
 		}
-		println!("\n++ final slot_stake {}", KSM(slot_stake));
+
+		println!("============================");
+		println!("++ connected to [{}]", uri);
+		println!("++ total_issuance = {:?}", KSM(total_issuance));
+		println!("++ args: [count to elect = {}] [min-count = {}] [output = {:?}]", validator_count, minimum_validator_count, output_file);
+		println!("++ validator intentions count {:?}", validators.len());
+		println!("++ nominator intentions count {:?}", nominators.len());
+		println!("++ final slot_stake {:?}", KSM(slot_stake));
 		futures::future::ok::<(), ()>(())
 	}))
 }
