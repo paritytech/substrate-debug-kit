@@ -33,13 +33,14 @@ use substrate_rpc_api::state::StateClient;
 use polkadot_primitives::{Hash, Balance, AccountId};
 use substrate_primitives::storage::StorageKey;
 use substrate_primitives::hashing::{blake2_256, twox_128};
-use substrate_phragmen::{elect, equalize, PhragmenResult, PhragmenStakedAssignment, Support, SupportMap};
+use substrate_phragmen::{
+	elect, equalize, PhragmenResult, PhragmenStakedAssignment, Support, SupportMap
+};
 use sr_primitives::traits::Convert;
 use support::storage::generator::Linkage;
 use staking::{StakingLedger, ValidatorPrefs};
 
 // TODO: clean function interfaces: probably no more passing string.
-// TODO: show address in valid kusama format.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
 // TODO: read number of candidates and minimum from the chain.
 
@@ -96,7 +97,6 @@ mod keys {
 		let key_string = "head of ".to_string() + &module + " " + &storage;
 		let mut key = key_string.as_bytes().to_vec();
 		key.extend_from_slice(&encoded_key);
-		// StorageKey(key)
 		StorageKey(blake2_256(key.as_slice()).to_vec())
 	}
 }
@@ -157,7 +157,6 @@ mod storage {
 		} else {
 			vec![]
 		}
-
 	}
 }
 
@@ -424,7 +423,11 @@ fn main() {
 		for (nominator, info) in nominator_info.iter() {
 			let staker_info = staker_infos.get(&nominator).unwrap();
 			let mut sum = 0;
-			println!("#{} {:?} // active_stake = {:?}", counter, nominator, KSM(staker_info.ledger.active));
+			println!(
+				"#{} {:?} // active_stake = {:?}",
+				counter,
+				nominator, KSM(staker_info.ledger.active),
+			);
 			println!("  Distributions:");
 			info.iter().enumerate().for_each(|(i, (c, s))| {
 				sum += *s;
@@ -440,7 +443,12 @@ fn main() {
 		println!("============================");
 		println!("++ connected to [{}]", uri);
 		println!("++ total_issuance = {:?}", KSM(total_issuance));
-		println!("++ args: [count to elect = {}] [min-count = {}] [output = {:?}]", validator_count, minimum_validator_count, output_file);
+		println!(
+			"++ args: [count to elect = {}] [min-count = {}] [output = {:?}]",
+			validator_count,
+			minimum_validator_count,
+			output_file,
+		);
 		println!("++ validator intentions count {:?}", validators.len());
 		println!("++ nominator intentions count {:?}", nominators.len());
 		println!("++ final slot_stake {:?}", KSM(slot_stake));
