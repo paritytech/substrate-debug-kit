@@ -1,7 +1,9 @@
 # Offline Phragmen
 
 Simple script that runs the phragmen method on the current validator candidates of a locally running
-substrate chain.
+substrate chain. 
+
+# How to use 
 
 ```bash
 offline-phragmen 0.1
@@ -27,11 +29,15 @@ OPTIONS:
     -o, --output <FILE>                      Json output file name. dumps the results into if given.
 ```
 
+> **NOTE**: You must have a locally running node. For now, this code only attempts to connect to a local node (`127.0.0.1:9944`).
+
 # Phrag.. what?
 
-Read more about the phragmen's method [here](https://wiki.polkadot.network/docs/en/learn-phragmen). What this code implements is the sequential method with
+Read more about the phragmen's method [here](https://wiki.polkadot.network/docs/en/learn-phragmen). What `substrate/core/phragmen` code implements is the sequential method with
 two iterations of postprocessing. This is fixed for now, since it is also fixed in srml-staking and
 might change over time.
+
+The repository is just an RPC wrapper around the code in substrate. 
 
 ## FAQ
 
