@@ -252,8 +252,8 @@ fn main() {
 		set_default_ss58_version(addr_format);
 
 		// chose json output file
-		let output_file = matches.value_of("output");
-		if output_file.is_some() {
+		let maybe_output_file = matches.value_of("output");
+		if maybe_output_file.is_some() {
 			panic!("output to json not implemented.");
 		}
 

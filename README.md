@@ -1,9 +1,9 @@
 # Offline Phragmen
 
 Simple script that runs the phragmen method on the current validator candidates of a locally running
-substrate chain. 
+substrate chain.
 
-# How to use 
+# How to use
 
 ```bash
 offline-phragmen 0.1
@@ -37,7 +37,7 @@ Read more about the phragmen's method [here](https://wiki.polkadot.network/docs/
 two iterations of postprocessing. This is fixed for now, since it is also fixed in srml-staking and
 might change over time.
 
-The repository is just an RPC wrapper around the code in substrate. 
+The repository is just an RPC wrapper around the code in substrate.
 
 ## FAQ
 
@@ -49,6 +49,6 @@ stake_ which is also outputted per execution.
 > Will my validator keep its spot if more slots become available?
 
 **FOR SURE YES**. Phragmen choses the results __in order__. if you ask for 10 elected candidates, and
-then 50, the first 10 will be the same in the two runs, given the same input. For example, your validator in spot 21 should always be in spot 21, regardless of if you ask for 30 or 40 elected candidates. 
+then 50, the first 10 will be the same in the two runs, given the same input. For example, your validator in spot 21 should always be in spot 21, regardless of if you ask for 30 or 40 elected candidates.
 
 **Note that** since we do the post-processing, the nominations that your candidate end up with migh differ if more slots become available. Hence, the total stake of your candidate might also differ.
