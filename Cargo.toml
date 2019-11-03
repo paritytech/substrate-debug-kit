@@ -10,13 +10,15 @@ futures = "0.1.29"
 hyper = "0.12"
 separator = "0.4.1"
 codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
-jsonrpc-core-client = { version = "13.2.0", features = ["http", "ws", "tls"] }
+jsonrpc-core-client = { version = "14.0.3", features = ["http", "ws", "tls"] }
+serde = { version = "1.0.102", features = ["derive"] }
+serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 clap = "2.33.0"
 
-polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "v0.6" }
-substrate-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-substrate-phragmen = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-substrate-primitives = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master", features = ["std"] }
-sr-primitives = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-support = { package = "srml-support", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-staking = { package = "srml-staking", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "master"}
+substrate-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "kiz-serde-phragmen" }
+substrate-phragmen = { git = "https://github.com/paritytech/substrate", branch = "kiz-serde-phragmen" }
+substrate-primitives = { git = "https://github.com/paritytech/substrate", branch = "kiz-serde-phragmen"}
+sr-primitives = { git = "https://github.com/paritytech/substrate", branch = "kiz-serde-phragmen" }
+support = { package = "srml-support", git = "https://github.com/paritytech/substrate", branch = "kiz-serde-phragmen" }
+staking = { package = "srml-staking", git = "https://github.com/paritytech/substrate", branch = "kiz-serde-phragmen" }

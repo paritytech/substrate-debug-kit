@@ -34,7 +34,7 @@ use polkadot_primitives::{Hash, Balance, AccountId};
 use substrate_primitives::storage::StorageKey;
 use substrate_primitives::hashing::{blake2_256, twox_128};
 use substrate_phragmen::{
-	elect, equalize, PhragmenResult, PhragmenStakedAssignment, Support, SupportMap
+	elect, equalize, build_support_map, PhragmenResult, PhragmenStakedAssignment
 };
 use sr_primitives::traits::Convert;
 use support::storage::generator::Linkage;
@@ -42,7 +42,6 @@ use staking::{StakingLedger, ValidatorPrefs};
 
 // TODO: clean function interfaces: probably no more passing string.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
-// TODO: read number of candidates and minimum from the chain.
 
 type Client = StateClient<Hash>;
 
@@ -167,7 +166,6 @@ mod network {
 
 	pub const TOLERANCE: u128 = 0_u128;
 	pub const ITERATIONS: usize = 2_usize;
-
 	/// a way to attach the total issuance to `CurrencyToVoteHandler`.
 	pub trait GetTotalIssuance {
 		fn get_total_issuance() -> Balance;
@@ -199,7 +197,7 @@ fn main() {
 
 		// connect to a local node.
 		let uri = "http://localhost:9933";
-		let client: Client = http::connect(uri).wait().unwrap();
+		let client: Client = http::connect::<Client>(uri).wait().unwrap();
 
 
 		let matches = App::new("offline-phragmen")
@@ -253,9 +251,6 @@ fn main() {
 
 		// chose json output file
 		let maybe_output_file = matches.value_of("output");
-		if maybe_output_file.is_some() {
-			panic!("output to json not implemented.");
-		}
 
 		// stash key of all wannabe candidates.
 		let validators = storage::enumerate_linked_map::<
@@ -334,31 +329,17 @@ fn main() {
 			slashable_balance,
 			true,
 		).ok_or("Phragmen failed to elect.").unwrap();
-		let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
 
 		let to_votes = |b: Balance|
 			<network::CurrencyToVoteHandler<TotalIssuance> as Convert<Balance, u64>>::convert(b) as u128;
 
-		// Initialize the support of each candidate.
-		let mut supports = <SupportMap<AccountId>>::new();
-		elected_stashes
-			.iter()
-			.map(|e| (e, to_votes(slashable_balance(e))))
-			.for_each(|(e, s)| {
-				let item = Support { own: s, total: s, ..Default::default() };
-				supports.insert(e.clone(), item);
-			});
-
-		// build support struct.
-		for (n, assignment) in assignments.iter() {
-			for (c, per_thing) in assignment.iter() {
-				let nominator_stake = to_votes(slashable_balance(n));
-				let other_stake = *per_thing * nominator_stake;
-				let support= supports.get_mut(c).unwrap();
-				support.total = support.total.saturating_add(other_stake);
-				support.others.push((n.clone(), other_stake));
-			}
-		}
+		let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
+		let mut supports = build_support_map::<Balance, AccountId, _, network::CurrencyToVoteHandler<TotalIssuance>>(
+			&elected_stashes,
+			&assignments,
+			slashable_balance,
+			true,
+		);
 
 		// prepare and run post-processing.
 		let mut staked_assignments
@@ -447,11 +428,30 @@ fn main() {
 			"++ args: [count to elect = {}] [min-count = {}] [output = {:?}]",
 			validator_count,
 			minimum_validator_count,
-			output_file,
+			maybe_output_file,
 		);
 		println!("++ validator intentions count {:?}", validators.len());
 		println!("++ nominator intentions count {:?}", nominators.len());
 		println!("++ final slot_stake {:?}", KSM(slot_stake));
+
+		// potentially write to json file
+		if let Some(output_file) = maybe_output_file {
+			use std::fs::File;
+			// let json_support = serde_json::to_string_pretty(&supports).unwrap();
+			// let json_winners = serde_json::to_string_pretty(&elected_stashes).unwrap();
+
+			let output = serde_json::json!({
+				"supports": supports,
+				"winners": elected_stashes,
+			});
+
+			serde_json::to_writer(
+				&File::create(format!("{}", output_file)).unwrap(),
+				&output
+			).unwrap();
+		}
+
 		futures::future::ok::<(), ()>(())
+
 	}))
 }
