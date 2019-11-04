@@ -447,7 +447,7 @@ fn main() {
 			"++ args: [count to elect = {}] [min-count = {}] [output = {:?}]",
 			validator_count,
 			minimum_validator_count,
-			output_file,
+			maybe_output_file,
 		);
 		println!("++ validator intentions count {:?}", validators.len());
 		println!("++ nominator intentions count {:?}", nominators.len());
