@@ -37,8 +37,8 @@ use substrate_phragmen::{
 	elect, equalize, build_support_map, PhragmenResult, PhragmenStakedAssignment
 };
 use sr_primitives::traits::Convert;
-use support::storage::generator::Linkage;
-use staking::{StakingLedger, ValidatorPrefs};
+use srml_support::storage::generator::Linkage;
+use srml_staking::{StakingLedger, ValidatorPrefs};
 
 // TODO: clean function interfaces: probably no more passing string.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
@@ -197,7 +197,7 @@ fn main() {
 
 		// connect to a local node.
 		let uri = "http://localhost:9933";
-		let client: Client = http::connect::<Client>(uri).wait().unwrap();
+		let client: StateClient<Hash> = http::connect::<Client>(uri).wait().unwrap();
 
 
 		let matches = App::new("offline-phragmen")
