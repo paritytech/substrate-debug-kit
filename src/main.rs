@@ -27,7 +27,7 @@ use codec::Decode;
 use separator::Separatable;
 use clap::{Arg, App};
 use jsonrpc_core_client::transports::{http};
-use substrate_rpc_api::state::StateClient;
+use sc_rpc_api::state::StateClient;
 
 
 use polkadot_primitives::{Hash, Balance, AccountId};
@@ -260,7 +260,7 @@ fn main() {
 		// stash key of all wannabe candidates.
 		let validators = storage::enumerate_linked_map::<
 			AccountId,
-			ValidatorPrefs<Balance>,
+			ValidatorPrefs,
 		>(
 			"Staking".to_string(),
 			"Validators".to_string(),
@@ -332,7 +332,6 @@ fn main() {
 			validators.clone(),
 			nominators.clone(),
 			slashable_balance,
-			true,
 		).ok_or("Phragmen failed to elect.").unwrap();
 		let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
 
