@@ -81,23 +81,35 @@ mod keys {
 
 	/// create key for a simple value.
 	pub fn value(module: String, storage: String) -> StorageKey {
-		let storage_key = module + " " + &storage;
-		StorageKey(twox_128(storage_key.as_bytes()).to_vec())
+		let module_prefix = twox_128(&module.as_bytes().to_vec());
+		let storage_prefix = twox_128(&storage.as_bytes().to_vec());
+		
+		let mut final_key = module_prefix.to_vec();
+		final_key.extend_from_slice(&storage_prefix);
+		StorageKey(final_key.to_vec())
 	}
 
 	/// create key for a map.
 	pub fn map(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
-		let mut storage_key = Vec::from((module + " " + &storage).as_bytes());
-		storage_key.extend_from_slice(&encoded_key);
-		StorageKey(blake2_256(storage_key.as_slice()).to_vec())
+		let module_prefix = twox_128(&module.as_bytes().to_vec());
+		let storage_prefix = twox_128(&storage.as_bytes().to_vec());
+		let key_hash = blake2_256(encoded_key);
+		
+		let mut final_key = module_prefix.to_vec();
+		final_key.extend_from_slice(&storage_prefix);
+		final_key.extend_from_slice(&key_hash);
+		StorageKey(final_key.to_vec())
 	}
 
 	/// create key for a linked_map head.
-	pub fn linked_map_head(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
-		let key_string = "head of ".to_string() + &module + " " + &storage;
-		let mut key = key_string.as_bytes().to_vec();
-		key.extend_from_slice(&encoded_key);
-		StorageKey(blake2_256(key.as_slice()).to_vec())
+	pub fn linked_map_head(module: String, storage: String) -> StorageKey {
+		let module_prefix = twox_128(&module.as_bytes().to_vec());
+		let storage_head_string = "HeadOf".to_string() + &storage;
+		let storage_head_prefix = twox_128(&storage_head_string.as_bytes().to_vec());
+		
+		let mut final_key = module_prefix.to_vec();
+		final_key.extend_from_slice(&storage_head_prefix);
+		StorageKey(final_key.to_vec())
 	}
 }
 
@@ -126,7 +138,6 @@ mod storage {
 			keys::linked_map_head(
 				module.clone(),
 				storage.clone(),
-				"".as_bytes(),
 			),
 			&client,
 		);
