@@ -38,7 +38,7 @@ use substrate_phragmen::{
 };
 use sr_primitives::traits::Convert;
 use support::storage::generator::Linkage;
-use staking::{StakingLedger, ValidatorPrefs};
+use staking::{StakingLedger, ValidatorPrefs, Nominations};
 
 // TODO: clean function interfaces: probably no more passing string.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
@@ -279,14 +279,14 @@ fn main() {
 		).into_iter().map(|(v, _p)| v).collect::<Vec<AccountId>>();
 
 		// stash key of current nominators
-		let nominators = storage::enumerate_linked_map::<
+		let nominators: Vec<(AccountId, Vec<AccountId>)> = storage::enumerate_linked_map::<
 			AccountId,
-			Vec<AccountId>,
+			Nominations<AccountId>,
 		>(
 			"Staking".to_string(),
 			"Nominators".to_string(),
 			&client,
-		);
+		).into_iter().map(|(v, p)| (v, p.targets)).collect();
 
 		// get the slashable balance of every entity
 		let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
