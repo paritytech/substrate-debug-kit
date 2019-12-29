@@ -491,8 +491,6 @@ fn main() {
 		// potentially write to json file
 		if let Some(output_file) = maybe_output_file {
 			use std::fs::File;
-			// let json_support = serde_json::to_string_pretty(&supports).unwrap();
-			// let json_winners = serde_json::to_string_pretty(&elected_stashes).unwrap();
 
 			let output = serde_json::json!({
 				"supports": supports,
