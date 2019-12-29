@@ -27,18 +27,18 @@ use codec::Decode;
 use separator::Separatable;
 use clap::{Arg, App};
 use jsonrpc_core_client::transports::{http};
-use substrate_rpc_api::state::StateClient;
+use sc_rpc_api::state::StateClient;
 
 
 use polkadot_primitives::{Hash, Balance, AccountId};
-use substrate_primitives::storage::StorageKey;
-use substrate_primitives::hashing::{blake2_256, twox_128};
-use substrate_phragmen::{
-	elect, equalize, build_support_map, PhragmenResult, PhragmenStakedAssignment
+use sp_core::storage::StorageKey;
+use sp_core::hashing::{blake2_256, twox_128};
+use sp_phragmen::{
+	elect, equalize, PhragmenResult, PhragmenStakedAssignment, build_support_map,
 };
-use sr_primitives::traits::Convert;
-use srml_support::storage::generator::Linkage;
-use srml_staking::{StakingLedger, ValidatorPrefs};
+use sp_runtime::traits::Convert;
+use support::storage::generator::Linkage;
+use staking::{StakingLedger, ValidatorPrefs, Nominations};
 
 // TODO: clean function interfaces: probably no more passing string.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
@@ -80,23 +80,31 @@ mod keys {
 
 	/// create key for a simple value.
 	pub fn value(module: String, storage: String) -> StorageKey {
-		let storage_key = module + " " + &storage;
-		StorageKey(twox_128(storage_key.as_bytes()).to_vec())
+		let mut final_key = [0u8; 32];
+		final_key[0..16].copy_from_slice(&twox_128(module.as_bytes()));
+		final_key[16..32].copy_from_slice(&twox_128(storage.as_bytes()));
+		StorageKey(final_key.to_vec())
 	}
 
 	/// create key for a map.
 	pub fn map(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
-		let mut storage_key = Vec::from((module + " " + &storage).as_bytes());
-		storage_key.extend_from_slice(&encoded_key);
-		StorageKey(blake2_256(storage_key.as_slice()).to_vec())
+		let module_key = twox_128(module.as_bytes());
+		let storage_key = twox_128(storage.as_bytes());
+		let key = blake2_256(encoded_key);
+		let mut final_key = Vec::with_capacity(module_key.len() + storage_key.len() + key.len());
+		final_key.extend_from_slice(&module_key);
+		final_key.extend_from_slice(&storage_key);
+		final_key.extend_from_slice(&key);
+		StorageKey(final_key)
 	}
 
 	/// create key for a linked_map head.
-	pub fn linked_map_head(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
-		let key_string = "head of ".to_string() + &module + " " + &storage;
-		let mut key = key_string.as_bytes().to_vec();
-		key.extend_from_slice(&encoded_key);
-		StorageKey(blake2_256(key.as_slice()).to_vec())
+	pub fn linked_map_head(module: String, storage: String) -> StorageKey {
+		let head_prefix = "HeadOf".to_string() + &storage;
+		let mut final_key = [0u8; 32];
+		final_key[0..16].copy_from_slice(&twox_128(module.as_bytes()));
+		final_key[16..32].copy_from_slice(&twox_128(head_prefix.as_bytes()));
+		StorageKey(final_key.to_vec())
 	}
 }
 
@@ -125,11 +133,9 @@ mod storage {
 			keys::linked_map_head(
 				module.clone(),
 				storage.clone(),
-				"".as_bytes(),
 			),
 			&client,
 		);
-
 		if let Some(head_key) = maybe_head_key {
 			let mut ptr = head_key;
 			let mut enumerations = Vec::<(K, T)>::new();
@@ -142,10 +148,12 @@ mod storage {
 					),
 					&client,
 				).unwrap();
+
 				enumerations.push((
 					ptr,
 					next_value,
 				));
+
 				if let Some(next) = next_key.next {
 					ptr = next;
 				} else {
@@ -207,8 +215,8 @@ fn main() {
 			.arg(Arg::with_name("count")
 				.short("c")
 				.long("count")
-				.value_name("VALIDATOR_COUNT")
-				.help("count of validators to elect. Should be equal to chain.staking.validatorCount. Default is 50.")
+				.value_name("COUNT")
+				.help("count of member/validators to elect. Default is 50.")
 				.takes_value(true)
 			).arg(Arg::with_name("network")
 				.short("n")
@@ -225,9 +233,13 @@ fn main() {
 			).arg(Arg::with_name("min-count")
 				.short("m")
 				.long("min-count")
-				.value_name("MIN_VALIDATOR_COUNT")
-				.help("minimum number of validators to elect. If less candidates are available, phragmen will go south. Should be equal to chain.staking.minimumValidatorCount. Default is 10.")
+				.value_name("MIN_COUNT")
+				.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 10.")
 				.takes_value(true)
+			).arg(Arg::with_name("no-self-vote")
+				.short("s")
+				.long("no-self-vote")
+				.help("disable self voting for candidates")
 			).get_matches();
 
 		let validator_count = matches.value_of("count")
@@ -246,16 +258,22 @@ fn main() {
 			"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
 			_ => panic!("invalid address format"),
 		};
-		use substrate_primitives::crypto::{set_default_ss58_version, Ss58AddressFormat};
+		use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 		set_default_ss58_version(addr_format);
 
-		// chose json output file
+		// chose json output file.
 		let maybe_output_file = matches.value_of("output");
 
+		// self-vote?
+		let do_self_vote = !matches.is_present("no-self-vote");
+
+		// start file scraping timer.
+		let start_data = std::time::Instant::now();
+
 		// stash key of all wannabe candidates.
-		let validators = storage::enumerate_linked_map::<
+		let candidates = storage::enumerate_linked_map::<
 			AccountId,
-			ValidatorPrefs<Balance>,
+			ValidatorPrefs,
 		>(
 			"Staking".to_string(),
 			"Validators".to_string(),
@@ -263,20 +281,31 @@ fn main() {
 		).into_iter().map(|(v, _p)| v).collect::<Vec<AccountId>>();
 
 		// stash key of current nominators
-		let nominators = storage::enumerate_linked_map::<
+		let mut voters = storage::enumerate_linked_map::<
 			AccountId,
-			Vec<AccountId>,
+			Nominations<AccountId>,
 		>(
 			"Staking".to_string(),
 			"Nominators".to_string(),
 			&client,
-		);
+		)
+			.into_iter()
+			.map(|(who, n)| (who, n.targets))
+			.collect::<Vec<(AccountId, Vec<AccountId>)>>();
+
+		// add self-vote
+		if do_self_vote {
+			candidates.iter().for_each(|v| {
+				let self_vote = (v.clone(), vec![v.clone()]);
+				voters.push(self_vote);
+			});
+		}
 
 		// get the slashable balance of every entity
 		let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
 
-		let mut all_stakers = validators.clone();
-		all_stakers.extend(nominators.iter().map(|(n, _)| n.clone()).collect::<Vec<AccountId>>());
+		let mut all_stakers= candidates.clone();
+		all_stakers.extend(voters.iter().map(|(n, _)| n.clone()).collect::<Vec<AccountId>>());
 		all_stakers.iter().for_each(|stash| {
 			let ctrl = storage::read::<AccountId>(
 				keys::map("Staking".to_string(), "Bonded".to_string(), stash.as_ref()),
@@ -297,14 +326,23 @@ fn main() {
 		};
 
 		// Get the total issuance and update the global pointer to it.
-		let mut total_issuance = storage::read::<Balance>(
+		let maybe_total_issuance = storage::read::<Balance>(
 			keys::value(
 				"Balances".to_string(),
 				"TotalIssuance".to_string()
 			),
 			&client,
-		).unwrap();
+		);
+
+		let mut total_issuance = maybe_total_issuance.unwrap_or(0);
 		unsafe { ISSUANCE = &mut total_issuance; }
+		println!("++ total_issuance = {:?}", KSM(total_issuance));
+		println!(
+			"++ args: [count to elect = {}] [min-count = {}] [output = {:?}]",
+			validator_count,
+			minimum_validator_count,
+			maybe_output_file,
+		);
 
 		struct TotalIssuance;
 		impl network::GetTotalIssuance for TotalIssuance {
@@ -316,6 +354,9 @@ fn main() {
 		}
 
 		// run phragmen
+		let data_elapsed = start_data.elapsed().as_millis();
+
+		let start_phragmen = std::time::Instant::now();
 		let PhragmenResult { winners, assignments } = elect::<
 			AccountId,
 			Balance,
@@ -324,10 +365,9 @@ fn main() {
 		>(
 			validator_count,
 			minimum_validator_count,
-			validators.clone(),
-			nominators.clone(),
+			candidates.clone(),
+			voters.clone(),
 			slashable_balance,
-			true,
 		).ok_or("Phragmen failed to elect.").unwrap();
 
 		let to_votes = |b: Balance|
@@ -338,17 +378,22 @@ fn main() {
 			&elected_stashes,
 			&assignments,
 			slashable_balance,
-			true,
 		);
 
 		// prepare and run post-processing.
 		let mut staked_assignments
-			: Vec<(AccountId, Vec<PhragmenStakedAssignment<AccountId>>)>
-			= Vec::with_capacity(assignments.len());
+		: Vec<(AccountId, Vec<PhragmenStakedAssignment<AccountId>>)>
+		= Vec::with_capacity(assignments.len());
 		for (n, assignment) in assignments.iter() {
+			// If this is a self vote, then we don't need to equalise it at all. While the
+			// staking system does not allow nomination and validation at the same time,
+			// this must always be 100% support.
+			if assignment.len() == 1 && assignment[0].0 == *n {
+				continue;
+			}
 			let mut staked_assignment
-				: Vec<PhragmenStakedAssignment<AccountId>>
-				= Vec::with_capacity(assignment.len());
+			: Vec<PhragmenStakedAssignment<AccountId>>
+			= Vec::with_capacity(assignment.len());
 			for (c, per_thing) in assignment.iter() {
 				let nominator_stake = to_votes(slashable_balance(n));
 				let other_stake = *per_thing * nominator_stake;
@@ -370,6 +415,8 @@ fn main() {
 			slashable_balance,
 		);
 
+		let phragmen_elapsed = start_phragmen.elapsed().as_millis();
+
 		let mut slot_stake = u128::max_value();
 		let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
 
@@ -389,14 +436,19 @@ fn main() {
 				other_count,
 				staker_infos.get(&s.0).unwrap().ctrl,
 			);
-			assert_eq!(support.total, support.own + others_sum);
 			if support.total < slot_stake { slot_stake = support.total; }
 			println!("  Voters:");
-			support.others.iter().enumerate().for_each(|(i, o)| {
-				println!("	#{} [amount = {:?}] {:?}", i, KSM(o.1), o);
-
+			support.others.iter().enumerate().filter(|(_, o)| o.0 != s.0).for_each(|(i, o)| {
+				println!("	#{} [amount = {:?}] {:?}", i, KSM(o.1), o.0);
 				nominator_info.entry(o.0.clone()).or_insert(vec![]).push((s.0.clone(), o.1));
 			});
+			assert_eq!(
+				support.total, support.own + others_sum,
+				"wrong support map detected: {} != {} [diff = {:?}]",
+				support.total,
+				support.own + others_sum,
+				KSM(support.total.max(support.own + others_sum) - support.total.min(support.own + others_sum)),
+			);
 		});
 
 		println!("\n######################################\n+++ Updated Assignments:");
@@ -430,9 +482,11 @@ fn main() {
 			minimum_validator_count,
 			maybe_output_file,
 		);
-		println!("++ validator intentions count {:?}", validators.len());
-		println!("++ nominator intentions count {:?}", nominators.len());
+		println!("++ candidates intentions count {:?}", candidates.len());
+		println!("++ voters intentions count {:?}", voters.len());
 		println!("++ final slot_stake {:?}", KSM(slot_stake));
+		println!("++ Data fetch Completed in {} ms.", data_elapsed);
+		println!("++ Phragmen Completed in {} ms.", phragmen_elapsed);
 
 		// potentially write to json file
 		if let Some(output_file) = maybe_output_file {
@@ -445,7 +499,7 @@ fn main() {
 				"winners": elected_stashes,
 			});
 
-			serde_json::to_writer(
+			serde_json::to_writer_pretty(
 				&File::create(format!("{}", output_file)).unwrap(),
 				&output
 			).unwrap();

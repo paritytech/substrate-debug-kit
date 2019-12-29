@@ -10,15 +10,15 @@ futures = "0.1.29"
 hyper = "0.12"
 separator = "0.4.1"
 codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
-jsonrpc-core-client = { path = "/Users/kianenigma/Desktop/Parity/jsonrpc/core-client", features = ["http", "ws", "tls"] }
+jsonrpc-core-client = { version = "14.0.2", features = ["http", "ws", "tls", "arbitrary_precision"] }
 serde = { version = "1.0.102", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 clap = "2.33.0"
 
-polkadot-primitives = { path = "../polkadot/primitives" }
-substrate-rpc-api = { path = "../substrate/core/rpc/api" }
-substrate-phragmen = { path = "../substrate/core/phragmen" }
-substrate-primitives = { path = "../substrate/core/primitives" }
-sr-primitives = { path = "../substrate/core/sr-primitives" }
-srml-support = { path = "../substrate/srml/support" }
-srml-staking = { path = "../substrate/srml/staking" }
+polkadot-primitives = { git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
+sc-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+sp-phragmen = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master", features = ["std"] }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+support = { package = "frame-support", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+staking = { package = "pallet-staking", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
