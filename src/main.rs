@@ -27,18 +27,18 @@ use codec::Decode;
 use separator::Separatable;
 use clap::{Arg, App};
 use jsonrpc_core_client::transports::{http};
-use substrate_rpc_api::state::StateClient;
+use sc_rpc_api::state::StateClient;
 
 
 use polkadot_primitives::{Hash, Balance, AccountId};
-use substrate_primitives::storage::StorageKey;
-use substrate_primitives::hashing::{blake2_256, twox_128};
-use substrate_phragmen::{
+use sp_core::storage::StorageKey;
+use sp_core::hashing::{blake2_256, twox_128};
+use sp_phragmen::{
 	elect, equalize, PhragmenResult, PhragmenStakedAssignment, Support, SupportMap
 };
-use sr_primitives::traits::Convert;
+use sp_runtime::traits::Convert;
 use support::storage::generator::Linkage;
-use staking::{StakingLedger, ValidatorPrefs};
+use staking::{StakingLedger, ValidatorPrefs, Nominations};
 
 // TODO: clean function interfaces: probably no more passing string.
 // TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
@@ -81,23 +81,31 @@ mod keys {
 
 	/// create key for a simple value.
 	pub fn value(module: String, storage: String) -> StorageKey {
-		let storage_key = module + " " + &storage;
-		StorageKey(twox_128(storage_key.as_bytes()).to_vec())
+		let mut final_key = [0u8; 32];
+		final_key[0..16].copy_from_slice(&twox_128(module.as_bytes()));
+		final_key[16..32].copy_from_slice(&twox_128(storage.as_bytes()));
+		StorageKey(final_key.to_vec())
 	}
 
 	/// create key for a map.
 	pub fn map(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
-		let mut storage_key = Vec::from((module + " " + &storage).as_bytes());
-		storage_key.extend_from_slice(&encoded_key);
-		StorageKey(blake2_256(storage_key.as_slice()).to_vec())
+		let module_key = twox_128(module.as_bytes());
+		let storage_key = twox_128(storage.as_bytes());
+		let key = blake2_256(encoded_key);
+		let mut final_key = Vec::with_capacity(module_key.len() + storage_key.len() + key.len());
+		final_key.extend_from_slice(&module_key);
+		final_key.extend_from_slice(&storage_key);
+		final_key.extend_from_slice(&key);
+		StorageKey(final_key)
 	}
 
 	/// create key for a linked_map head.
-	pub fn linked_map_head(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
-		let key_string = "head of ".to_string() + &module + " " + &storage;
-		let mut key = key_string.as_bytes().to_vec();
-		key.extend_from_slice(&encoded_key);
-		StorageKey(blake2_256(key.as_slice()).to_vec())
+	pub fn linked_map_head(module: String, storage: String) -> StorageKey {
+		let head_prefix = "HeadOf".to_string() + &storage;
+		let mut final_key = [0u8; 32];
+		final_key[0..16].copy_from_slice(&twox_128(module.as_bytes()));
+		final_key[16..32].copy_from_slice(&twox_128(head_prefix.as_bytes()));
+		StorageKey(final_key.to_vec())
 	}
 }
 
@@ -126,11 +134,9 @@ mod storage {
 			keys::linked_map_head(
 				module.clone(),
 				storage.clone(),
-				"".as_bytes(),
 			),
 			&client,
 		);
-
 		if let Some(head_key) = maybe_head_key {
 			let mut ptr = head_key;
 			let mut enumerations = Vec::<(K, T)>::new();
@@ -143,10 +149,12 @@ mod storage {
 					),
 					&client,
 				).unwrap();
+
 				enumerations.push((
 					ptr,
 					next_value,
 				));
+
 				if let Some(next) = next_key.next {
 					ptr = next;
 				} else {
@@ -248,7 +256,7 @@ fn main() {
 			"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
 			_ => panic!("invalid address format"),
 		};
-		use substrate_primitives::crypto::{set_default_ss58_version, Ss58AddressFormat};
+		use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 		set_default_ss58_version(addr_format);
 
 		// chose json output file
@@ -257,10 +265,12 @@ fn main() {
 			panic!("output to json not implemented.");
 		}
 
+		let start_data = std::time::Instant::now();
+
 		// stash key of all wannabe candidates.
 		let validators = storage::enumerate_linked_map::<
 			AccountId,
-			ValidatorPrefs<Balance>,
+			ValidatorPrefs,
 		>(
 			"Staking".to_string(),
 			"Validators".to_string(),
@@ -268,14 +278,23 @@ fn main() {
 		).into_iter().map(|(v, _p)| v).collect::<Vec<AccountId>>();
 
 		// stash key of current nominators
-		let nominators = storage::enumerate_linked_map::<
+		let mut nominators = storage::enumerate_linked_map::<
 			AccountId,
-			Vec<AccountId>,
+			Nominations<AccountId>,
 		>(
 			"Staking".to_string(),
 			"Nominators".to_string(),
 			&client,
-		);
+		)
+			.into_iter()
+			.map(|(who, n)| (who, n.targets))
+			.collect::<Vec<(AccountId, Vec<AccountId>)>>();
+
+		// add self-vote
+		validators.iter().for_each(|v| {
+			let self_vote = (v.clone(), vec![v.clone()]);
+			nominators.push(self_vote);
+		});
 
 		// get the slashable balance of every entity
 		let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
@@ -302,14 +321,23 @@ fn main() {
 		};
 
 		// Get the total issuance and update the global pointer to it.
-		let mut total_issuance = storage::read::<Balance>(
+		let maybe_total_issuance = storage::read::<Balance>(
 			keys::value(
 				"Balances".to_string(),
 				"TotalIssuance".to_string()
 			),
 			&client,
-		).unwrap();
+		);
+
+		let mut total_issuance = maybe_total_issuance.unwrap_or(0);
 		unsafe { ISSUANCE = &mut total_issuance; }
+		println!("++ total_issuance = {:?}", KSM(total_issuance));
+		println!(
+			"++ args: [count to elect = {}] [min-count = {}] [output = {:?}]",
+			validator_count,
+			minimum_validator_count,
+			maybe_output_file,
+		);
 
 		struct TotalIssuance;
 		impl network::GetTotalIssuance for TotalIssuance {
@@ -320,7 +348,11 @@ fn main() {
 			}
 		}
 
+		// TODO: slashing span retain?
+
 		// run phragmen
+		println!("Data fetch Completed in {} ms.", start_data.elapsed().as_millis());
+		let start_phragmen = std::time::Instant::now();
 		let PhragmenResult { winners, assignments } = elect::<
 			AccountId,
 			Balance,
@@ -332,8 +364,8 @@ fn main() {
 			validators.clone(),
 			nominators.clone(),
 			slashable_balance,
-			true,
 		).ok_or("Phragmen failed to elect.").unwrap();
+
 		let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
 
 		let to_votes = |b: Balance|
@@ -389,6 +421,8 @@ fn main() {
 			slashable_balance,
 		);
 
+		println!("Phragmen Completed in {} ms.", start_phragmen.elapsed().as_millis());
+
 		let mut slot_stake = u128::max_value();
 		let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
 
@@ -412,7 +446,7 @@ fn main() {
 			if support.total < slot_stake { slot_stake = support.total; }
 			println!("  Voters:");
 			support.others.iter().enumerate().for_each(|(i, o)| {
-				println!("	#{} [amount = {:?}] {:?}", i, KSM(o.1), o);
+				println!("	#{} [amount = {:?}] {:?}", i, KSM(o.1), o.0);
 
 				nominator_info.entry(o.0.clone()).or_insert(vec![]).push((s.0.clone(), o.1));
 			});
