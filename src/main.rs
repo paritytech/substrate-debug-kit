@@ -26,7 +26,7 @@ use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
 use codec::Decode;
 use separator::Separatable;
 use clap::{Arg, App};
-use jsonrpc_core_client::transports::{http};
+use jsonrpc_core_client::transports::{http, ws};
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 pub use sc_rpc_api::state::StateClient;
 
@@ -256,24 +256,29 @@ mod election_utils {
 	const MODULE: &'static str = "PhragmenElection";
 
 	pub fn get_candidates(client: &Client) -> Vec<AccountId> {
-		let mut members = storage::read::<Vec<AccountId>>(
+		let mut members = storage::read::<Vec<(AccountId, Balance)>>(
 			keys::value(MODULE.to_string(), "Members".to_string()),
 			client,
-		).unwrap_or_default();
+		).unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
 
 		let runners = storage::read::<Vec<(AccountId, Balance)>>(
 			keys::value(MODULE.to_string(), "RunnersUp".to_string()),
 			client,
 		).unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
 
-		let candidates = storage::read::<Vec<(AccountId, Balance)>>(
+		let candidates = storage::read::<Vec<AccountId>>(
 			keys::value(MODULE.to_string(), "Candidates".to_string()),
 			client,
-		).unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
+		).unwrap_or_default();
 
 		dbg!(&members);
 		dbg!(&runners);
 		dbg!(&candidates);
+
+		// dbg!(storage::read::<Vec<AccountId>>(
+		// 	keys::value(MODULE.to_string(), "Members".to_string()),
+		// 	client,
+		// ).unwrap_or_default());
 
 		members.extend(candidates);
 		members.extend(runners);
@@ -308,14 +313,13 @@ fn main() {
 	rt::run(rt::lazy(|| {
 		// WILL NOT WORK. to connect to a remote node. Yet, the ws client is not being properly
 		// created and there is no way to pass SSL cert. stuff.
-		// let uri = "wss://canary-5.kusama.network/";
-		// let URL = url::Url::parse(uri).unwrap();
-		// let client: Client<Hash> = ws::connect(&URL).wait().unwrap();
+		// let uri = "wss://kusama-rpc.polkadot.io/";
+		// let target_url = url::Url::parse(uri).unwrap();
+		// let client: Client = ws::connect(&target_url).wait().unwrap();
 
 		// connect to a local node.
 		let uri = "http://localhost:9933";
-		let client: StateClient<Hash> = http::connect::<Client>(uri).wait().unwrap();
-
+		let client: Client = http::connect::<Client>(uri).wait().unwrap();
 
 		let matches = App::new("offline-phragmen")
 			.version("0.1")
@@ -339,7 +343,7 @@ fn main() {
 			).arg(Arg::with_name("min-count")
 				.short("m")
 				.long("min-count")
-				.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 10.")
+				.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.")
 				.takes_value(true)
 			).arg(Arg::with_name("iterations")
 				.short("i")
@@ -361,22 +365,13 @@ fn main() {
 			.parse()
 			.unwrap();
 		let minimum_validator_count = matches.value_of("min-count")
-			.unwrap_or("10")
+			.unwrap_or("0")
 			.parse()
 			.unwrap();
 		let iterations: usize = matches.value_of("iterations")
 			.unwrap_or("2")
 			.parse()
 			.unwrap();
-
-		// setup address format
-		let addr_format = match matches.value_of("network").unwrap_or("kusama") {
-			"kusama" => Ss58AddressFormat::KusamaAccountDirect,
-			"polkadot" => Ss58AddressFormat::PolkadotAccountDirect,
-			"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
-			_ => panic!("invalid address format"),
-		};
-		set_default_ss58_version(addr_format);
 
 		// chose json output file.
 		let maybe_output_file = matches.value_of("output");
@@ -405,6 +400,15 @@ fn main() {
 		}
 		let mut total_issuance = maybe_total_issuance.unwrap_or(0);
 		unsafe { ISSUANCE = &mut total_issuance; }
+
+		// setup address format
+		let addr_format = match matches.value_of("network").unwrap_or("kusama") {
+			"kusama" => Ss58AddressFormat::KusamaAccountDirect,
+			"polkadot" => Ss58AddressFormat::PolkadotAccountDirect,
+			"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
+			_ => panic!("invalid address format"),
+		};
+		set_default_ss58_version(addr_format);
 
 		// start file scraping timer.
 		let start_data = std::time::Instant::now();
@@ -503,10 +507,8 @@ fn main() {
 		winners.iter().enumerate().for_each(|(i, s)| {
 			println!("#{} == {} [{:?}]", i + 1, network::get_nick(&client, &s.0), s.0);
 			let support = supports.get(&s.0).unwrap();
-			let others_sum: Balance = support.voters.iter().map(|(_n, s)| s).sum();
-			let other_count = support.voters.len();
-
-			assert_eq!(others_sum, support.total);
+			let others_sum: Balance = support.others.iter().map(|(_n, s)| s).sum();
+			let other_count = support.others.len();
 
 			println!(
 				"[stake_total: {:?}] [vote_count: {}] [ctrl: {:?}]",
@@ -518,7 +520,7 @@ fn main() {
 			if support.total < slot_stake { slot_stake = support.total; }
 
 			println!("  Voters:");
-			support.voters.iter().enumerate().for_each(|(i, o)| {
+			support.others.iter().enumerate().for_each(|(i, o)| {
 				println!(
 					"	{}#{} [amount = {:?}] {:?}",
 					if s.0 == o.0 { "*" } else { "" },
@@ -528,6 +530,9 @@ fn main() {
 				);
 				nominator_info.entry(o.0.clone()).or_insert(vec![]).push((s.0.clone(), o.1));
 			});
+
+			assert_eq!(others_sum, support.total);
+
 		});
 
 		println!("\n######################################\n+++ Updated Assignments:");
