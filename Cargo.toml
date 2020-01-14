@@ -5,7 +5,7 @@ authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2018"
 
 [dependencies]
-url = "2.1.0"
+url = "1.7.0"
 futures = "0.1.29"
 hyper = "0.12"
 separator = "0.4.1"
@@ -16,9 +16,19 @@ serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 clap = "2.33.0"
 
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
+
+# Remote crates
 sc-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
 sp-phragmen = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master", features = ["std"] }
 sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
 support = { package = "frame-support", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
 staking = { package = "pallet-staking", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master", features = ["std"] }
+
+# For local debug
+# sc-rpc-api = { path = "./../substrate/client/rpc-api" }
+# sp-phragmen = { path = "./../substrate/primitives/phragmen" }
+# sp-runtime = { path = "./../substrate/primitives/runtime" }
+# support = { path = "./../substrate/frame/support", package = "frame-support" }
+# staking = { path = "./../substrate/frame/staking", package = "pallet-staking" }
+# sp-core = { path = "./../substrate/primitives/core", features = ["std"] }
