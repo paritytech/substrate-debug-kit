@@ -271,15 +271,6 @@ mod election_utils {
 			client,
 		).unwrap_or_default();
 
-		dbg!(&members);
-		dbg!(&runners);
-		dbg!(&candidates);
-
-		// dbg!(storage::read::<Vec<AccountId>>(
-		// 	keys::value(MODULE.to_string(), "Members".to_string()),
-		// 	client,
-		// ).unwrap_or_default());
-
 		members.extend(candidates);
 		members.extend(runners);
 
@@ -358,6 +349,11 @@ fn main() {
 				.short("e")
 				.long("elections")
 				.help("execute the council election.")
+			).arg(Arg::with_name("verbose")
+				.short("v")
+				.multiple(true)
+				.long("verbose")
+				.help("Print more output")
 			).get_matches();
 
 		let validator_count = matches.value_of("count")
@@ -372,6 +368,7 @@ fn main() {
 			.unwrap_or("2")
 			.parse()
 			.unwrap();
+		let verbosity = matches.occurrences_of("v");
 
 		// chose json output file.
 		let maybe_output_file = matches.value_of("output");
@@ -469,34 +466,36 @@ fn main() {
 			slashable_balance,
 		);
 
-		// prepare and run post-processing.
-		let mut staked_assignments
-		: Vec<(AccountId, Vec<PhragmenStakedAssignment<AccountId>>)>
-		= Vec::with_capacity(assignments.len());
-		for (n, assignment) in assignments.iter() {
-			let mut staked_assignment
-			: Vec<PhragmenStakedAssignment<AccountId>>
-			= Vec::with_capacity(assignment.len());
-			for (c, per_thing) in assignment.iter() {
-				let nominator_stake = to_votes(slashable_balance(n));
-				let other_stake = *per_thing * nominator_stake;
-				staked_assignment.push((c.clone(), other_stake));
+		if iterations > 0 {
+			// prepare and run post-processing.
+			let mut staked_assignments
+			: Vec<(AccountId, Vec<PhragmenStakedAssignment<AccountId>>)>
+			= Vec::with_capacity(assignments.len());
+			for (n, assignment) in assignments.iter() {
+				let mut staked_assignment
+				: Vec<PhragmenStakedAssignment<AccountId>>
+				= Vec::with_capacity(assignment.len());
+				for (c, per_thing) in assignment.iter() {
+					let nominator_stake = to_votes(slashable_balance(n));
+					let other_stake = *per_thing * nominator_stake;
+					staked_assignment.push((c.clone(), other_stake));
+				}
+				staked_assignments.push((n.clone(), staked_assignment));
 			}
-			staked_assignments.push((n.clone(), staked_assignment));
-		}
 
-		equalize::<
-			_,
-			_,
-			network::CurrencyToVoteHandler<TotalIssuance>,
-			_,
-		>(
-			staked_assignments,
-			&mut supports,
-			network::TOLERANCE,
-			iterations,
-			slashable_balance,
-		);
+			equalize::<
+				_,
+				_,
+				network::CurrencyToVoteHandler<TotalIssuance>,
+				_,
+			>(
+				staked_assignments,
+				&mut supports,
+				network::TOLERANCE,
+				iterations,
+				slashable_balance,
+			);
+		}
 
 		let phragmen_elapsed = start_phragmen.elapsed().as_millis();
 
@@ -507,8 +506,8 @@ fn main() {
 		winners.iter().enumerate().for_each(|(i, s)| {
 			println!("#{} == {} [{:?}]", i + 1, network::get_nick(&client, &s.0), s.0);
 			let support = supports.get(&s.0).unwrap();
-			let others_sum: Balance = support.others.iter().map(|(_n, s)| s).sum();
-			let other_count = support.others.len();
+			let others_sum: Balance = support.voters.iter().map(|(_n, s)| s).sum();
+			let other_count = support.voters.len();
 
 			println!(
 				"[stake_total: {:?}] [vote_count: {}] [ctrl: {:?}]",
@@ -519,42 +518,48 @@ fn main() {
 
 			if support.total < slot_stake { slot_stake = support.total; }
 
-			println!("  Voters:");
-			support.others.iter().enumerate().for_each(|(i, o)| {
-				println!(
-					"	{}#{} [amount = {:?}] {:?}",
-					if s.0 == o.0 { "*" } else { "" },
-					i,
-					KSM(o.1),
-					o.0
-				);
-				nominator_info.entry(o.0.clone()).or_insert(vec![]).push((s.0.clone(), o.1));
-			});
+			if verbosity >= 1 {
+				println!("  Voters:");
+				support.voters.iter().enumerate().for_each(|(i, o)| {
+					println!(
+						"	{}#{} [amount = {:?}] {:?}",
+						if s.0 == o.0 { "*" } else { "" },
+						i,
+						KSM(o.1),
+						o.0
+					);
+					nominator_info.entry(o.0.clone()).or_insert(vec![]).push((s.0.clone(), o.1));
+				});
+			}
+
+			println!("");
 
 			assert_eq!(others_sum, support.total);
 
 		});
 
-		println!("\n######################################\n+++ Updated Assignments:");
-		let mut counter = 1;
-		for (nominator, info) in nominator_info.iter() {
-			let staker_info = staker_infos.get(&nominator).unwrap();
-			let mut sum = 0;
-			println!(
-				"#{} {:?} // active_stake = {:?}",
-				counter,
-				nominator, KSM(staker_info.stake),
-			);
-			println!("  Distributions:");
-			info.iter().enumerate().for_each(|(i, (c, s))| {
-				sum += *s;
-				println!("    #{} {:?} => {:?}", i, c, KSM(*s));
-			});
-			counter += 1;
-			let diff = sum.max(staker_info.stake) - sum.min(staker_info.stake);
-			// acceptable diff is one millionth of a KSM
-			assert!(diff < 1_000, "diff( sum_nominations,  staker_info.ledger.active) = {}", diff);
-			println!("");
+		if verbosity >= 2 {
+			println!("\n######################################\n+++ Updated Assignments:");
+			let mut counter = 1;
+			for (nominator, info) in nominator_info.iter() {
+				let staker_info = staker_infos.get(&nominator).unwrap();
+				let mut sum = 0;
+				println!(
+					"#{} {:?} // active_stake = {:?}",
+					counter,
+					nominator, KSM(staker_info.stake),
+				);
+				println!("  Distributions:");
+				info.iter().enumerate().for_each(|(i, (c, s))| {
+					sum += *s;
+					println!("    #{} {:?} => {:?}", i, c, KSM(*s));
+				});
+				counter += 1;
+				let diff = sum.max(staker_info.stake) - sum.min(staker_info.stake);
+				// acceptable diff is one millionth of a KSM
+				assert!(diff < 1_000, "diff( sum_nominations,  staker_info.ledger.active) = {}", diff);
+				println!("");
+			}
 		}
 
 		println!("============================");
@@ -574,6 +579,7 @@ fn main() {
 		println!("++ final slot_stake {:?}", KSM(slot_stake));
 		println!("++ Data fetch Completed in {} ms.", data_elapsed);
 		println!("++ Phragmen Completed in {} ms.", phragmen_elapsed);
+		println!("++ Phragmen Assignment size {} bytes.", codec::Encode::encode(&assignments).len());
 
 		// potentially write to json file
 		if let Some(output_file) = maybe_output_file {
