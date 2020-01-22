@@ -303,81 +303,90 @@ mod election_utils {
 }
 
 fn main() {
+	env_logger::try_init().ok();
+	let matches = App::new("offline-phragmen")
+		.version("0.1")
+		.author("Kian Paimani <kian@parity.io>")
+		.about("Runs the phragmen election algorithm of any substrate chain with staking module offline (aka. off the chain) and predicts the results.")
+		.arg(Arg::with_name("uri")
+			.short("u")
+			.long("uri")
+			.help("websockets uri of the substrate node. Default is ws://localhost:9944.")
+			.takes_value(true)
+		).arg(Arg::with_name("count")
+		.short("c")
+		.long("count")
+		.help("count of member/validators to elect. Default is 50.")
+		.takes_value(true)
+	).arg(Arg::with_name("network")
+		.short("n")
+		.long("network")
+		.help("network address format. Can be kusama|polkadot|substrate. Default is kusama.")
+		.takes_value(true)
+	).arg(Arg::with_name("output")
+		.short("o")
+		.long("output")
+		.help("json output file name. dumps the results into if given.")
+		.takes_value(true)
+	).arg(Arg::with_name("min-count")
+		.short("m")
+		.long("min-count")
+		.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.")
+		.takes_value(true)
+	).arg(Arg::with_name("iterations")
+		.short("i")
+		.long("iters")
+		.help("number of post-processing iterations to run. Default is 2")
+		.takes_value(true)
+	).arg(Arg::with_name("no-self-vote")
+		.short("s")
+		.long("no-self-vote")
+		.help("disable self voting for candidates")
+	).arg(Arg::with_name("elections")
+		.short("e")
+		.long("elections")
+		.help("execute the council election.")
+	).arg(Arg::with_name("verbose")
+		.short("v")
+		.multiple(true)
+		.long("verbose")
+		.help("Print more output")
+	).get_matches();
+
+	let uri = matches.value_of("uri")
+		.unwrap_or("ws://localhost:9944");
+	let validator_count = matches.value_of("count")
+		.unwrap_or("50")
+		.parse()
+		.unwrap();
+	let minimum_validator_count = matches.value_of("min-count")
+		.unwrap_or("0")
+		.parse()
+		.unwrap();
+	let iterations: usize = matches.value_of("iterations")
+		.unwrap_or("2")
+		.parse()
+		.unwrap();
+	let verbosity = matches.occurrences_of("v");
+
+	// chose json output file.
+	let maybe_output_file = matches.value_of("output");
+
+	// self-vote?
+	let do_self_vote = !matches.is_present("no-self-vote");
+
+	// staking or elections?
+	let do_elections = matches.is_present("elections");
+
+	// setup address format
+	let addr_format = match matches.value_of("network").unwrap_or("kusama") {
+		"kusama" => Ss58AddressFormat::KusamaAccountDirect,
+		"polkadot" => Ss58AddressFormat::PolkadotAccountDirect,
+		"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
+		_ => panic!("invalid address format"),
+	};
+
 	async_std::task::block_on(async move {
-		let matches = App::new("offline-phragmen")
-			.version("0.1")
-			.author("Kian Paimani <kian@parity.io>")
-			.about("Runs the phragmen election algorithm of any substrate chain with staking module offline (aka. off the chain) and predicts the results.")
-			.arg(Arg::with_name("uri")
-				 .short("u")
-				 .long("uri")
-				 .help("websockets uri of the substrate node. Default is ws://localhost:9944.")
-				 .takes_value(true)
-			).arg(Arg::with_name("count")
-				.short("c")
-				.long("count")
-				.help("count of member/validators to elect. Default is 50.")
-				.takes_value(true)
-			).arg(Arg::with_name("network")
-				.short("n")
-				.long("network")
-				.help("network address format. Can be kusama|polkadot|substrate. Default is kusama.")
-				.takes_value(true)
-			).arg(Arg::with_name("output")
-				.short("o")
-				.long("output")
-				.help("json output file name. dumps the results into if given.")
-				.takes_value(true)
-			).arg(Arg::with_name("min-count")
-				.short("m")
-				.long("min-count")
-				.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.")
-				.takes_value(true)
-			).arg(Arg::with_name("iterations")
-				.short("i")
-				.long("iters")
-				.help("number of post-processing iterations to run. Default is 2")
-				.takes_value(true)
-			).arg(Arg::with_name("no-self-vote")
-				.short("s")
-				.long("no-self-vote")
-				.help("disable self voting for candidates")
-			).arg(Arg::with_name("elections")
-				.short("e")
-				.long("elections")
-				.help("execute the council election.")
-			).arg(Arg::with_name("verbose")
-				.short("v")
-				.multiple(true)
-				.long("verbose")
-				.help("Print more output")
-			).get_matches();
-
-		let uri = matches.value_of("uri")
-			.unwrap_or("ws://localhost:9944");
-		let validator_count = matches.value_of("count")
-			.unwrap_or("50")
-			.parse()
-			.unwrap();
-		let minimum_validator_count = matches.value_of("min-count")
-			.unwrap_or("0")
-			.parse()
-			.unwrap();
-		let iterations: usize = matches.value_of("iterations")
-			.unwrap_or("2")
-			.parse()
-			.unwrap();
-		let verbosity = matches.occurrences_of("v");
-
-		// chose json output file.
-		let maybe_output_file = matches.value_of("output");
-
-		// self-vote?
-		let do_self_vote = !matches.is_present("no-self-vote");
-
-		// staking or elections?
-		let do_elections = matches.is_present("elections");
-
 		// connect to a node.
 		let client: Client = jsonrpsee::ws::ws_raw_client(uri)
 			.await
@@ -403,13 +412,6 @@ fn main() {
 		let mut total_issuance = maybe_total_issuance.unwrap_or(0);
 		unsafe { ISSUANCE = &mut total_issuance; }
 
-		// setup address format
-		let addr_format = match matches.value_of("network").unwrap_or("kusama") {
-			"kusama" => Ss58AddressFormat::KusamaAccountDirect,
-			"polkadot" => Ss58AddressFormat::PolkadotAccountDirect,
-			"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
-			_ => panic!("invalid address format"),
-		};
 		set_default_ss58_version(addr_format);
 
 		// start file scraping timer.
@@ -599,7 +601,5 @@ fn main() {
 				&output
 			).unwrap();
 		}
-
-//		futures::future::ok::<(), ()>(())
 	})
 }

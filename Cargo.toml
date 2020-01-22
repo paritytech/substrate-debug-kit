@@ -9,6 +9,8 @@ async-std = "1.2.0"
 url = "1.7.0"
 futures = "0.3.1"
 hyper = "0.12"
+log = "0.4.8"
+env_logger = "0.7.1"
 separator = "0.4.1"
 codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
 jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee/", features = ["ws"] }
