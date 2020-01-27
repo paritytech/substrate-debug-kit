@@ -53,14 +53,14 @@ const DECIMAL_POINTS: Balance = 1_000_000_000_000;
 
 impl fmt::Debug for KSM {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let num: u64 = self.0.try_into().unwrap();
+		let num: u128 = self.0.try_into().unwrap();
 		write!(f, "{}_KSM ({})", self.0 / DECIMAL_POINTS, num.separated_string())
 	}
 }
 
 impl fmt::Display for KSM {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let num: u64 = self.0.try_into().unwrap();
+		let num: u128 = self.0.try_into().unwrap();
 		write!(f, "{}", num.separated_string())
 	}
 }
