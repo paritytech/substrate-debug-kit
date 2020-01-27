@@ -19,17 +19,25 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -c, --count <VALIDATOR_COUNT>            count of validators to elect. Should be equal to
-                                             chain.staking.validatorCount. Default is 50.
-    -m, --min-count <MIN_VALIDATOR_COUNT>    minimum number of validators to elect. If less candidates are available,
-                                             phragmen will go south. Should be equal to
-                                             chain.staking.minimumValidatorCount. Default is 10.
-    -n, --network <NETWORK>                  network address format. Can be kusama|polkadot|substrate. Default is
-                                             kusama.
-    -o, --output <FILE>                      Json output file name. dumps the results into if given.
+    -c, --count <count>            count of member/validators to elect. Default is 50.
+    -i, --iters <iterations>       number of post-processing iterations to run. Default is 2
+    -m, --min-count <min-count>    minimum number of members/validators to elect. If less candidates are available,
+                                   phragmen will go south. Default is 0.
+    -n, --network <network>        network address format. Can be kusama|polkadot|substrate. Default is kusama.
+    -o, --output <output>          json output file name. dumps the results into if given.
+    -u, --uri <uri>                websockets uri of the substrate node. Default is ws://localhost:9944.
 ```
 
-> **NOTE**: You must have a locally running node. For now, this code only attempts to connect to a local node (`127.0.0.1:9944`).
+## Connecting to a node
+
+By default it will attempt to connect to a locally running node running at `ws://127.0.0.1:9944`.
+
+Connect to a different node using the `--uri` argument e.g. `--uri wss://kusama-rpc.polkadot.io/`.
+
+### Uri Format
+
+- **`ws://`** prefix: plain (unencrypted) websockets connection.
+- **`wss://`** prefix: TLS (encrypted) websockets connection. 
 
 # Phrag.. what?
 

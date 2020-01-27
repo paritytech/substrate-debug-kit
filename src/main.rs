@@ -20,18 +20,16 @@
 #![warn(missing_docs)]
 #![warn(unused_extern_crates)]
 
-use futures::Future;
-use hyper::rt;
 use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
 use codec::Decode;
 use separator::Separatable;
 use clap::{Arg, App};
-use jsonrpc_core_client::transports::{http, ws};
+use jsonrpsee::Client;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 pub use sc_rpc_api::state::StateClient;
 
 pub use polkadot_primitives::{Hash, Balance, AccountId};
-use sp_core::storage::StorageKey;
+use sp_core::storage::{StorageData, StorageKey};
 use sp_core::hashing::{blake2_256, twox_128};
 use sp_phragmen::{
 	elect, equalize, PhragmenResult, PhragmenStakedAssignment, build_support_map,
@@ -40,9 +38,6 @@ use sp_runtime::traits::Convert;
 use support::storage::generator::Linkage;
 
 // TODO: clean function interfaces: probably no more passing string.
-// TODO: allow it to read data from remote node (there's an issue with JSON-PRC client).
-
-type Client = StateClient<Hash>;
 
 /// A staker
 #[derive(Debug)]
@@ -58,14 +53,14 @@ const DECIMAL_POINTS: Balance = 1_000_000_000_000;
 
 impl fmt::Debug for KSM {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let num: u64 = self.0.try_into().unwrap();
+		let num: u128 = self.0.try_into().unwrap();
 		write!(f, "{}_KSM ({})", self.0 / DECIMAL_POINTS, num.separated_string())
 	}
 }
 
 impl fmt::Display for KSM {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let num: u64 = self.0.try_into().unwrap();
+		let num: u128 = self.0.try_into().unwrap();
 		write!(f, "{}", num.separated_string())
 	}
 }
@@ -109,19 +104,24 @@ mod keys {
 
 /// Some helpers to read storage.
 mod storage {
-	use super::{StorageKey, Future, Decode, Debug, Linkage, Client};
+	use jsonrpsee::{core::common::{to_value as to_json_value, Params}, Client};
+	use super::{StorageKey, StorageData, Decode, Debug, Linkage};
 	use super::keys;
 
 	/// Read from a raw key regardless of the type.
-	pub fn read<T: Decode>(key: StorageKey, client: &Client) -> Option<T> {
-		let raw = client.storage(key, None).wait().unwrap();
+	pub async fn read<T: Decode>(key: StorageKey, client: &Client) -> Option<T> {
+		let serialized_key = to_json_value(key).expect("StorageKey serialization infallible");
+		let raw: Option<StorageData> =
+			client.request("state_getStorage", Params::Array(vec![serialized_key]))
+				.await
+				.expect("Storage request failed");
 		let encoded = raw.map(|d| d.0)?;
 		<T as Decode>::decode(&mut encoded.as_slice()).ok()
 	}
 
 	/// enumerate and return all pairings of a linked map. Hopefully substrate will provide easier
 	/// ways of doing this in the future.
-	pub fn enumerate_linked_map<K, T>(
+	pub async fn enumerate_linked_map<K, T>(
 		module: String,
 		storage: String,
 		client: &Client
@@ -134,7 +134,7 @@ mod storage {
 				storage.clone(),
 			),
 			&client,
-		);
+		).await;
 		if let Some(head_key) = maybe_head_key {
 			let mut ptr = head_key;
 			let mut enumerations = Vec::<(K, T)>::new();
@@ -146,7 +146,7 @@ mod storage {
 						ptr.as_ref(),
 					),
 					&client,
-				).unwrap();
+				).await.unwrap();
 
 				enumerations.push((
 					ptr,
@@ -193,11 +193,11 @@ mod network {
 		fn convert(x: u128) -> Balance { x * Self::factor() }
 	}
 
-	pub fn get_nick(client: &Client, who: &AccountId) -> String {
+	pub async fn get_nick(client: &Client, who: &AccountId) -> String {
 		let nick = storage::read::<(Vec<u8>, Balance)>(
 			keys::map("Sudo".to_string(), "NameOf".to_string(), who.as_ref()),
 			client,
-		);
+		).await;
 
 		if nick.is_some() {
 			String::from_utf8(nick.unwrap().0).unwrap()
@@ -211,7 +211,7 @@ mod staking_utils {
 	use super::{AccountId, storage, keys, Staker, Balance, Client};
 	use staking::{ValidatorPrefs, Nominations, StakingLedger};
 
-	pub fn get_candidates(client: &Client) -> Vec<AccountId> {
+	pub async fn get_candidates(client: &Client) -> Vec<AccountId> {
 		storage::enumerate_linked_map::<
 			AccountId,
 			ValidatorPrefs,
@@ -219,10 +219,10 @@ mod staking_utils {
 			"Staking".to_string(),
 			"Validators".to_string(),
 			client,
-		).into_iter().map(|(v, _p)| v).collect::<Vec<AccountId>>()
+		).await.into_iter().map(|(v, _p)| v).collect::<Vec<AccountId>>()
 	}
 
-	pub fn get_voters(client: &Client) -> Vec<(AccountId, Vec<AccountId>)> {
+	pub async fn get_voters(client: &Client) -> Vec<(AccountId, Vec<AccountId>)> {
 		storage::enumerate_linked_map::<
 			AccountId,
 			Nominations<AccountId>,
@@ -231,21 +231,22 @@ mod staking_utils {
 			"Nominators".to_string(),
 			client,
 		)
+			.await
 			.into_iter()
 			.map(|(who, n)| (who, n.targets))
 			.collect::<Vec<(AccountId, Vec<AccountId>)>>()
 	}
 
-	pub fn get_staker_info_entry(stash: &AccountId, client: &Client) -> Staker {
+	pub async fn get_staker_info_entry(stash: &AccountId, client: &Client) -> Staker {
 		let ctrl = storage::read::<AccountId>(
 			keys::map("Staking".to_string(), "Bonded".to_string(), stash.as_ref()),
 			&client,
-		).expect("All stakers must have a ledger.");
+		).await.expect("All stakers must have a ledger.");
 
 		let ledger = storage::read::<StakingLedger<AccountId, Balance>>(
 			keys::map("Staking".to_string(), "Ledger".to_string(), ctrl.as_ref()),
 			&client,
-		).expect("All stakers must have a ledger.");
+		).await.expect("All stakers must have a ledger.");
 
 		Staker { ctrl: Some(ctrl), stake: ledger.active }
 	}
@@ -255,21 +256,21 @@ mod election_utils {
 	use super::{AccountId, storage, keys, Staker, Balance, Client};
 	const MODULE: &'static str = "PhragmenElection";
 
-	pub fn get_candidates(client: &Client) -> Vec<AccountId> {
+	pub async fn get_candidates(client: &Client) -> Vec<AccountId> {
 		let mut members = storage::read::<Vec<(AccountId, Balance)>>(
 			keys::value(MODULE.to_string(), "Members".to_string()),
 			client,
-		).unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
+		).await.unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
 
 		let runners = storage::read::<Vec<(AccountId, Balance)>>(
 			keys::value(MODULE.to_string(), "RunnersUp".to_string()),
 			client,
-		).unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
+		).await.unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
 
 		let candidates = storage::read::<Vec<AccountId>>(
 			keys::value(MODULE.to_string(), "Candidates".to_string()),
 			client,
-		).unwrap_or_default();
+		).await.unwrap_or_default();
 
 		members.extend(candidates);
 		members.extend(runners);
@@ -277,7 +278,7 @@ mod election_utils {
 		members
 	}
 
-	pub fn get_voters(client: &Client) -> Vec<(AccountId, Vec<AccountId>)> {
+	pub async fn get_voters(client: &Client) -> Vec<(AccountId, Vec<AccountId>)> {
 		storage::enumerate_linked_map::<
 			AccountId,
 			Vec<AccountId>,
@@ -286,98 +287,111 @@ mod election_utils {
 			"VotesOf".to_string(),
 			client,
 		)
+			.await
 			.into_iter()
 			.collect::<Vec<(AccountId, Vec<AccountId>)>>()
 	}
 
-	pub fn get_staker_info_entry(voter: &AccountId, client: &Client) -> Staker {
+	pub async fn get_staker_info_entry(voter: &AccountId, client: &Client) -> Staker {
 		let stake = storage::read::<Balance>(
 			keys::map(MODULE.to_string(), "StakeOf".to_string(), voter.as_ref()),
 			&client,
-		).unwrap_or_default();
+		).await.unwrap_or_default();
 
 		Staker { ctrl: None, stake }
 	}
 }
 
 fn main() {
-	rt::run(rt::lazy(|| {
-		// WILL NOT WORK. to connect to a remote node. Yet, the ws client is not being properly
-		// created and there is no way to pass SSL cert. stuff.
-		// let uri = "wss://kusama-rpc.polkadot.io/";
-		// let target_url = url::Url::parse(uri).unwrap();
-		// let client: Client = ws::connect(&target_url).wait().unwrap();
+	env_logger::try_init().ok();
+	let matches = App::new("offline-phragmen")
+		.version("0.1")
+		.author("Kian Paimani <kian@parity.io>")
+		.about("Runs the phragmen election algorithm of any substrate chain with staking module offline (aka. off the chain) and predicts the results.")
+		.arg(Arg::with_name("uri")
+			.short("u")
+			.long("uri")
+			.help("websockets uri of the substrate node. Default is ws://localhost:9944.")
+			.takes_value(true)
+		).arg(Arg::with_name("count")
+		.short("c")
+		.long("count")
+		.help("count of member/validators to elect. Default is 50.")
+		.takes_value(true)
+	).arg(Arg::with_name("network")
+		.short("n")
+		.long("network")
+		.help("network address format. Can be kusama|polkadot|substrate. Default is kusama.")
+		.takes_value(true)
+	).arg(Arg::with_name("output")
+		.short("o")
+		.long("output")
+		.help("json output file name. dumps the results into if given.")
+		.takes_value(true)
+	).arg(Arg::with_name("min-count")
+		.short("m")
+		.long("min-count")
+		.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.")
+		.takes_value(true)
+	).arg(Arg::with_name("iterations")
+		.short("i")
+		.long("iters")
+		.help("number of post-processing iterations to run. Default is 2")
+		.takes_value(true)
+	).arg(Arg::with_name("no-self-vote")
+		.short("s")
+		.long("no-self-vote")
+		.help("disable self voting for candidates")
+	).arg(Arg::with_name("elections")
+		.short("e")
+		.long("elections")
+		.help("execute the council election.")
+	).arg(Arg::with_name("verbose")
+		.short("v")
+		.multiple(true)
+		.long("verbose")
+		.help("Print more output")
+	).get_matches();
 
-		// connect to a local node.
-		let uri = "http://localhost:9933";
-		let client: Client = http::connect::<Client>(uri).wait().unwrap();
+	let uri = matches.value_of("uri")
+		.unwrap_or("ws://localhost:9944");
+	let validator_count = matches.value_of("count")
+		.unwrap_or("50")
+		.parse()
+		.unwrap();
+	let minimum_validator_count = matches.value_of("min-count")
+		.unwrap_or("0")
+		.parse()
+		.unwrap();
+	let iterations: usize = matches.value_of("iterations")
+		.unwrap_or("2")
+		.parse()
+		.unwrap();
+	let verbosity = matches.occurrences_of("v");
 
-		let matches = App::new("offline-phragmen")
-			.version("0.1")
-			.author("Kian Paimani <kian@parity.io>")
-			.about("Runs the phragmen election algorithm of any substrate chain with staking module offline (aka. off the chain) and predicts the results.")
-			.arg(Arg::with_name("count")
-				.short("c")
-				.long("count")
-				.help("count of member/validators to elect. Default is 50.")
-				.takes_value(true)
-			).arg(Arg::with_name("network")
-				.short("n")
-				.long("network")
-				.help("network address format. Can be kusama|polkadot|substrate. Default is kusama.")
-				.takes_value(true)
-			).arg(Arg::with_name("output")
-				.short("o")
-				.long("output")
-				.help("json output file name. dumps the results into if given.")
-				.takes_value(true)
-			).arg(Arg::with_name("min-count")
-				.short("m")
-				.long("min-count")
-				.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.")
-				.takes_value(true)
-			).arg(Arg::with_name("iterations")
-				.short("i")
-				.long("iters")
-				.help("number of post-processing iterations to run. Default is 2")
-				.takes_value(true)
-			).arg(Arg::with_name("no-self-vote")
-				.short("s")
-				.long("no-self-vote")
-				.help("disable self voting for candidates")
-			).arg(Arg::with_name("elections")
-				.short("e")
-				.long("elections")
-				.help("execute the council election.")
-			).arg(Arg::with_name("verbose")
-				.short("v")
-				.multiple(true)
-				.long("verbose")
-				.help("Print more output")
-			).get_matches();
+	// chose json output file.
+	let maybe_output_file = matches.value_of("output");
 
-		let validator_count = matches.value_of("count")
-			.unwrap_or("50")
-			.parse()
-			.unwrap();
-		let minimum_validator_count = matches.value_of("min-count")
-			.unwrap_or("0")
-			.parse()
-			.unwrap();
-		let iterations: usize = matches.value_of("iterations")
-			.unwrap_or("2")
-			.parse()
-			.unwrap();
-		let verbosity = matches.occurrences_of("v");
+	// self-vote?
+	let do_self_vote = !matches.is_present("no-self-vote");
 
-		// chose json output file.
-		let maybe_output_file = matches.value_of("output");
+	// staking or elections?
+	let do_elections = matches.is_present("elections");
 
-		// self-vote?
-		let do_self_vote = !matches.is_present("no-self-vote");
+	// setup address format
+	let addr_format = match matches.value_of("network").unwrap_or("kusama") {
+		"kusama" => Ss58AddressFormat::KusamaAccountDirect,
+		"polkadot" => Ss58AddressFormat::PolkadotAccountDirect,
+		"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
+		_ => panic!("invalid address format"),
+	};
 
-		// staking or elections?
-		let do_elections = matches.is_present("elections");
+	async_std::task::block_on(async move {
+		// connect to a node.
+		let client: Client = jsonrpsee::ws::ws_raw_client(uri)
+			.await
+			.expect("Failed to connect to client")
+			.into();
 
 		// Get the total issuance and update the global pointer to it.
 		let maybe_total_issuance = storage::read::<Balance>(
@@ -386,7 +400,7 @@ fn main() {
 				"TotalIssuance".to_string()
 			),
 			&client,
-		);
+		).await;
 		struct TotalIssuance;
 		impl network::GetTotalIssuance for TotalIssuance {
 			fn get_total_issuance() -> Balance {
@@ -398,23 +412,16 @@ fn main() {
 		let mut total_issuance = maybe_total_issuance.unwrap_or(0);
 		unsafe { ISSUANCE = &mut total_issuance; }
 
-		// setup address format
-		let addr_format = match matches.value_of("network").unwrap_or("kusama") {
-			"kusama" => Ss58AddressFormat::KusamaAccountDirect,
-			"polkadot" => Ss58AddressFormat::PolkadotAccountDirect,
-			"substrate" => Ss58AddressFormat::SubstrateAccountDirect,
-			_ => panic!("invalid address format"),
-		};
 		set_default_ss58_version(addr_format);
 
 		// start file scraping timer.
 		let start_data = std::time::Instant::now();
 
 		// stash key of all wannabe candidates.
-		let candidates = if do_elections { election_utils::get_candidates(&client) } else { staking_utils::get_candidates(&client) };
+		let candidates = if do_elections { election_utils::get_candidates(&client).await } else { staking_utils::get_candidates(&client).await };
 
 		// stash key of current nominators
-		let mut voters = if do_elections { election_utils::get_voters(&client) } else { staking_utils::get_voters(&client) };
+		let mut voters = if do_elections { election_utils::get_voters(&client).await } else { staking_utils::get_voters(&client).await };
 
 		// add self-vote
 		if do_self_vote {
@@ -429,10 +436,10 @@ fn main() {
 
 		let mut all_stakers= candidates.clone();
 		all_stakers.extend(voters.iter().map(|(n, _)| n.clone()).collect::<Vec<AccountId>>());
-		all_stakers.iter().for_each(|stash| {
-			let staker_info = if do_elections { election_utils::get_staker_info_entry(&stash, &client) } else { staking_utils::get_staker_info_entry(&stash, &client) };
+		for stash in all_stakers.iter() {
+			let staker_info = if do_elections { election_utils::get_staker_info_entry(&stash, &client).await } else { staking_utils::get_staker_info_entry(&stash, &client).await };
 			staker_infos.insert(stash.clone(), staker_info);
-		});
+		};
 
 		let slashable_balance = |who: &AccountId| -> Balance {
 			// NOTE: if we panic here then someone has voted for a non-candidate afaik.
@@ -503,8 +510,8 @@ fn main() {
 		let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
 
 		println!("\n######################################\n+++ Winner Validators:");
-		winners.iter().enumerate().for_each(|(i, s)| {
-			println!("#{} == {} [{:?}]", i + 1, network::get_nick(&client, &s.0), s.0);
+		for (i, s) in winners.iter().enumerate() {
+			println!("#{} == {} [{:?}]", i + 1, network::get_nick(&client, &s.0).await, s.0);
 			let support = supports.get(&s.0).unwrap();
 			let others_sum: Balance = support.voters.iter().map(|(_n, s)| s).sum();
 			let other_count = support.voters.len();
@@ -535,8 +542,7 @@ fn main() {
 			println!("");
 
 			assert_eq!(others_sum, support.total);
-
-		});
+		};
 
 		if verbosity >= 2 {
 			println!("\n######################################\n+++ Updated Assignments:");
@@ -595,8 +601,5 @@ fn main() {
 				&output
 			).unwrap();
 		}
-
-		futures::future::ok::<(), ()>(())
-
-	}))
+	})
 }
