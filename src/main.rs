@@ -24,18 +24,18 @@ use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
 use codec::Decode;
 use separator::Separatable;
 use clap::{Arg, App};
-use jsonrpsee::Client;
+use jsonrpsee::{Client, core::common::Params};
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 pub use sc_rpc_api::state::StateClient;
 
-pub use polkadot_primitives::{Hash, Balance, AccountId};
+pub use polkadot_primitives::{Hash, Balance, AccountId, BlockNumber};
 use sp_core::storage::{StorageData, StorageKey};
 use sp_core::hashing::{blake2_256, twox_128};
 use sp_phragmen::{
-	elect, equalize, PhragmenResult, PhragmenStakedAssignment, build_support_map,
+	elect, equalize, PhragmenResult, build_support_map,
 };
 use sp_runtime::traits::Convert;
-use support::storage::generator::Linkage;
+use frame_support::storage::generator::Linkage;
 
 // TODO: clean function interfaces: probably no more passing string.
 
@@ -105,14 +105,15 @@ mod keys {
 /// Some helpers to read storage.
 mod storage {
 	use jsonrpsee::{core::common::{to_value as to_json_value, Params}, Client};
-	use super::{StorageKey, StorageData, Decode, Debug, Linkage};
+	use super::{StorageKey, StorageData, Decode, Hash, fmt::Debug, Linkage};
 	use super::keys;
 
 	/// Read from a raw key regardless of the type.
-	pub async fn read<T: Decode>(key: StorageKey, client: &Client) -> Option<T> {
+	pub async fn read<T: Decode>(key: StorageKey, client: &Client, at: Hash) -> Option<T> {
 		let serialized_key = to_json_value(key).expect("StorageKey serialization infallible");
+		let at = to_json_value(at).expect("Block hash serialization infallible");
 		let raw: Option<StorageData> =
-			client.request("state_getStorage", Params::Array(vec![serialized_key]))
+			client.request("state_getStorage", Params::Array(vec![serialized_key, at]))
 				.await
 				.expect("Storage request failed");
 		let encoded = raw.map(|d| d.0)?;
@@ -124,7 +125,8 @@ mod storage {
 	pub async fn enumerate_linked_map<K, T>(
 		module: String,
 		storage: String,
-		client: &Client
+		client: &Client,
+		at: Hash,
 	) -> Vec<(K, T)>
 		where K: Decode + Debug + Clone + AsRef<[u8]>, T: Decode + Clone + Debug,
 	{
@@ -134,7 +136,9 @@ mod storage {
 				storage.clone(),
 			),
 			&client,
+			at,
 		).await;
+
 		if let Some(head_key) = maybe_head_key {
 			let mut ptr = head_key;
 			let mut enumerations = Vec::<(K, T)>::new();
@@ -146,6 +150,7 @@ mod storage {
 						ptr.as_ref(),
 					),
 					&client,
+					at,
 				).await.unwrap();
 
 				enumerations.push((
@@ -169,10 +174,9 @@ mod storage {
 /// Some implementations that need to be in sync with how the network is working. See the runtime
 /// of the node to which you are connecting for details.
 mod network {
-	use super::{Balance, Convert, Client, AccountId};
+	use super::{Balance, Convert, Client, AccountId, Hash};
 	use super::{storage, keys};
 
-	pub const TOLERANCE: u128 = 0_u128;
 	/// a way to attach the total issuance to `CurrencyToVoteHandler`.
 	pub trait GetTotalIssuance {
 		fn get_total_issuance() -> Balance;
@@ -193,10 +197,11 @@ mod network {
 		fn convert(x: u128) -> Balance { x * Self::factor() }
 	}
 
-	pub async fn get_nick(client: &Client, who: &AccountId) -> String {
+	pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
 		let nick = storage::read::<(Vec<u8>, Balance)>(
 			keys::map("Sudo".to_string(), "NameOf".to_string(), who.as_ref()),
 			client,
+			at,
 		).await;
 
 		if nick.is_some() {
@@ -208,10 +213,27 @@ mod network {
 }
 
 mod staking_utils {
-	use super::{AccountId, storage, keys, Staker, Balance, Client};
-	use staking::{ValidatorPrefs, Nominations, StakingLedger};
+	use super::{AccountId, storage, keys, Staker, Balance, Client, Hash};
+	use pallet_staking::{ValidatorPrefs, Nominations, StakingLedger, Exposure, EraIndex};
 
-	pub async fn get_candidates(client: &Client) -> Vec<AccountId> {
+	// TODO: remove later once this is public
+	type SpanIndex = u32;
+
+	#[derive(codec::Encode, codec::Decode, Debug)]
+	pub struct SlashingSpans {
+		span_index: SpanIndex,
+		last_start: EraIndex,
+		last_nonzero_slash: EraIndex,
+		prior: Vec<EraIndex>,
+	}
+
+	impl SlashingSpans {
+		pub(crate) fn last_nonzero_slash(&self) -> EraIndex {
+			self.last_nonzero_slash
+		}
+	}
+
+	pub async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 		storage::enumerate_linked_map::<
 			AccountId,
 			ValidatorPrefs,
@@ -219,57 +241,100 @@ mod staking_utils {
 			"Staking".to_string(),
 			"Validators".to_string(),
 			client,
+			at,
 		).await.into_iter().map(|(v, _p)| v).collect::<Vec<AccountId>>()
 	}
 
-	pub async fn get_voters(client: &Client) -> Vec<(AccountId, Vec<AccountId>)> {
-		storage::enumerate_linked_map::<
+	pub async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>)> {
+		let nominators: Vec<(AccountId, Nominations<AccountId>)> = storage::enumerate_linked_map::<
 			AccountId,
 			Nominations<AccountId>,
 		>(
 			"Staking".to_string(),
 			"Nominators".to_string(),
 			client,
-		)
-			.await
+			at,
+		).await;
+
+		nominators
 			.into_iter()
-			.map(|(who, n)| (who, n.targets))
+			.map(|(who, n)| {
+				let submitted_in = n.submitted_in;
+				let mut targets = n.targets;
+				targets.retain(|target| {
+					let maybe_slashing_spans = async_std::task::block_on(
+						slashing_span_of(&target, client, at)
+					);
+					dbg!(&maybe_slashing_spans);
+					maybe_slashing_spans.map_or(
+						true,
+						|spans| submitted_in >= spans.last_nonzero_slash(),
+					)
+				});
+
+				(who, targets)
+			})
 			.collect::<Vec<(AccountId, Vec<AccountId>)>>()
 	}
 
-	pub async fn get_staker_info_entry(stash: &AccountId, client: &Client) -> Staker {
+	pub async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> Staker {
 		let ctrl = storage::read::<AccountId>(
 			keys::map("Staking".to_string(), "Bonded".to_string(), stash.as_ref()),
 			&client,
+			at,
 		).await.expect("All stakers must have a ledger.");
 
 		let ledger = storage::read::<StakingLedger<AccountId, Balance>>(
 			keys::map("Staking".to_string(), "Ledger".to_string(), ctrl.as_ref()),
 			&client,
+			at,
 		).await.expect("All stakers must have a ledger.");
 
 		Staker { ctrl: Some(ctrl), stake: ledger.active }
 	}
+
+	pub async fn slashing_span_of(stash: &AccountId, client: &Client, at: Hash)
+		-> Option<SlashingSpans>
+	{
+		storage::read::<SlashingSpans>(
+			keys::map("Staking".to_string(), "SlashingSpans".to_string(), stash.as_ref()),
+			&client,
+			at,
+		).await
+	}
+
+	pub async fn exposure_of(stash: &AccountId, client: &Client, at: Hash)
+		-> Exposure<AccountId, Balance>
+	{
+		storage::read::<Exposure<AccountId, Balance>>(
+			keys::map("Staking".to_string(), "Stakers".to_string(), stash.as_ref()),
+			&client,
+			at,
+		).await.expect("All stakers must have a exposure.")
+	}
 }
 
 mod election_utils {
-	use super::{AccountId, storage, keys, Staker, Balance, Client};
+	use super::{AccountId, storage, keys, Staker, Balance, Client, Hash};
 	const MODULE: &'static str = "PhragmenElection";
 
-	pub async fn get_candidates(client: &Client) -> Vec<AccountId> {
+	pub async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 		let mut members = storage::read::<Vec<(AccountId, Balance)>>(
 			keys::value(MODULE.to_string(), "Members".to_string()),
 			client,
+			at,
 		).await.unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
 
 		let runners = storage::read::<Vec<(AccountId, Balance)>>(
 			keys::value(MODULE.to_string(), "RunnersUp".to_string()),
 			client,
+			at,
 		).await.unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
 
 		let candidates = storage::read::<Vec<AccountId>>(
 			keys::value(MODULE.to_string(), "Candidates".to_string()),
 			client,
+			at,
 		).await.unwrap_or_default();
 
 		members.extend(candidates);
@@ -278,7 +343,7 @@ mod election_utils {
 		members
 	}
 
-	pub async fn get_voters(client: &Client) -> Vec<(AccountId, Vec<AccountId>)> {
+	pub async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>)> {
 		storage::enumerate_linked_map::<
 			AccountId,
 			Vec<AccountId>,
@@ -286,16 +351,18 @@ mod election_utils {
 			MODULE.to_string(),
 			"VotesOf".to_string(),
 			client,
+			at,
 		)
 			.await
 			.into_iter()
 			.collect::<Vec<(AccountId, Vec<AccountId>)>>()
 	}
 
-	pub async fn get_staker_info_entry(voter: &AccountId, client: &Client) -> Staker {
+	pub async fn get_staker_info_entry(voter: &AccountId, client: &Client, at: Hash) -> Staker {
 		let stake = storage::read::<Balance>(
 			keys::map(MODULE.to_string(), "StakeOf".to_string(), voter.as_ref()),
 			&client,
+			at,
 		).await.unwrap_or_default();
 
 		Staker { ctrl: None, stake }
@@ -304,6 +371,7 @@ mod election_utils {
 
 fn main() {
 	env_logger::try_init().ok();
+
 	let matches = App::new("offline-phragmen")
 		.version("0.1")
 		.author("Kian Paimani <kian@parity.io>")
@@ -314,47 +382,55 @@ fn main() {
 			.help("websockets uri of the substrate node. Default is ws://localhost:9944.")
 			.takes_value(true)
 		).arg(Arg::with_name("count")
-		.short("c")
-		.long("count")
-		.help("count of member/validators to elect. Default is 50.")
-		.takes_value(true)
-	).arg(Arg::with_name("network")
-		.short("n")
-		.long("network")
-		.help("network address format. Can be kusama|polkadot|substrate. Default is kusama.")
-		.takes_value(true)
-	).arg(Arg::with_name("output")
-		.short("o")
-		.long("output")
-		.help("json output file name. dumps the results into if given.")
-		.takes_value(true)
-	).arg(Arg::with_name("min-count")
-		.short("m")
-		.long("min-count")
-		.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.")
-		.takes_value(true)
-	).arg(Arg::with_name("iterations")
-		.short("i")
-		.long("iters")
-		.help("number of post-processing iterations to run. Default is 2")
-		.takes_value(true)
-	).arg(Arg::with_name("no-self-vote")
-		.short("s")
-		.long("no-self-vote")
-		.help("disable self voting for candidates")
-	).arg(Arg::with_name("elections")
-		.short("e")
-		.long("elections")
-		.help("execute the council election.")
-	).arg(Arg::with_name("verbose")
-		.short("v")
-		.multiple(true)
-		.long("verbose")
-		.help("Print more output")
-	).get_matches();
+			.short("c")
+			.long("count")
+			.help("count of member/validators to elect. Default is 50.")
+			.takes_value(true)
+		).arg(Arg::with_name("network")
+			.short("n")
+			.long("network")
+			.help("network address format. Can be kusama|polkadot|substrate. Default is kusama.")
+			.takes_value(true)
+		).arg(Arg::with_name("output")
+			.short("o")
+			.long("output")
+			.help("json output file name. dumps the results into if given.")
+			.takes_value(true)
+		).arg(Arg::with_name("min-count")
+			.short("m")
+			.long("min-count")
+			.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.")
+			.takes_value(true)
+		).arg(Arg::with_name("iterations")
+			.short("i")
+			.long("iters")
+			.help("number of post-processing iterations to run. Default is 0")
+			.takes_value(true)
+		).arg(Arg::with_name("at")
+			.short("a")
+			.long("at")
+			.help("scrape the data at the given block hash. Default will be the head of the chain")
+			.takes_value(true)
+		).arg(Arg::with_name("no-self-vote")
+			.short("s")
+			.long("no-self-vote")
+			.help("disable self voting for candidates")
+		).arg(Arg::with_name("elections")
+			.short("e")
+			.long("elections")
+			.help("execute the council election.")
+		).arg(Arg::with_name("verbose")
+			.short("v")
+			.multiple(true)
+			.long("verbose")
+			.help("Print more output")
+		)
+	.get_matches();
 
 	let uri = matches.value_of("uri")
-		.unwrap_or("ws://localhost:9944");
+		.unwrap_or("ws://localhost:9944")
+		.to_string();
+
 	let validator_count = matches.value_of("count")
 		.unwrap_or("50")
 		.parse()
@@ -364,10 +440,15 @@ fn main() {
 		.parse()
 		.unwrap();
 	let iterations: usize = matches.value_of("iterations")
-		.unwrap_or("2")
+		.unwrap_or("0")
 		.parse()
 		.unwrap();
-	let verbosity = matches.occurrences_of("v");
+
+	// optionally at certain block hash
+	let maybe_at: Option<String> = matches.value_of("at").map(|s| s.to_string());
+
+	// Verbosity degree.
+	let verbosity = matches.occurrences_of("verbose");
 
 	// chose json output file.
 	let maybe_output_file = matches.value_of("output");
@@ -386,12 +467,28 @@ fn main() {
 		_ => panic!("invalid address format"),
 	};
 
-	async_std::task::block_on(async move {
+	async_std::task::block_on(async {
 		// connect to a node.
-		let client: Client = jsonrpsee::ws::ws_raw_client(uri)
+		let client: Client = jsonrpsee::ws::ws_raw_client(&uri)
 			.await
 			.expect("Failed to connect to client")
 			.into();
+
+		// get the latest block hash
+		let head = {
+			let data: Option<StorageData> = client.request("chain_getFinalizedHead", Params::None)
+				.await
+				.expect("Storage request failed");
+			let now_raw = data.expect("Should always get the head hash").0;
+			<Hash as Decode>::decode(&mut &*now_raw).expect("Block hash should decode")
+		};
+
+		// potentially replace with the given hash
+		let at: Hash = if let Some(at) = maybe_at {
+			Hash::from_slice(&hex::decode(at).expect("invalid hash format given"))
+		} else {
+			head
+		};
 
 		// Get the total issuance and update the global pointer to it.
 		let maybe_total_issuance = storage::read::<Balance>(
@@ -400,7 +497,9 @@ fn main() {
 				"TotalIssuance".to_string()
 			),
 			&client,
+			at,
 		).await;
+
 		struct TotalIssuance;
 		impl network::GetTotalIssuance for TotalIssuance {
 			fn get_total_issuance() -> Balance {
@@ -409,6 +508,7 @@ fn main() {
 				}
 			}
 		}
+
 		let mut total_issuance = maybe_total_issuance.unwrap_or(0);
 		unsafe { ISSUANCE = &mut total_issuance; }
 
@@ -418,10 +518,18 @@ fn main() {
 		let start_data = std::time::Instant::now();
 
 		// stash key of all wannabe candidates.
-		let candidates = if do_elections { election_utils::get_candidates(&client).await } else { staking_utils::get_candidates(&client).await };
+		let candidates = if do_elections {
+			election_utils::get_candidates(&client, at).await
+		} else {
+			staking_utils::get_candidates(&client, at).await
+		};
 
 		// stash key of current nominators
-		let mut voters = if do_elections { election_utils::get_voters(&client).await } else { staking_utils::get_voters(&client).await };
+		let mut voters = if do_elections {
+			election_utils::get_voters(&client, at).await
+		} else {
+			staking_utils::get_voters(&client, at).await
+		};
 
 		// add self-vote
 		if do_self_vote {
@@ -437,24 +545,29 @@ fn main() {
 		let mut all_stakers= candidates.clone();
 		all_stakers.extend(voters.iter().map(|(n, _)| n.clone()).collect::<Vec<AccountId>>());
 		for stash in all_stakers.iter() {
-			let staker_info = if do_elections { election_utils::get_staker_info_entry(&stash, &client).await } else { staking_utils::get_staker_info_entry(&stash, &client).await };
+			let staker_info =
+				if do_elections {
+					election_utils::get_staker_info_entry(&stash, &client, at).await
+				} else {
+					staking_utils::get_staker_info_entry(&stash, &client, at).await
+				};
 			staker_infos.insert(stash.clone(), staker_info);
 		};
 
 		let slashable_balance = |who: &AccountId| -> Balance {
-			// NOTE: if we panic here then someone has voted for a non-candidate afaik.
 			staker_infos.get(who).unwrap().stake
 		};
 
 		// run phragmen
 		let data_elapsed = start_data.elapsed().as_millis();
-
 		let start_phragmen = std::time::Instant::now();
+
 		let PhragmenResult { winners, assignments } = elect::<
 			AccountId,
 			Balance,
 			_,
-			network::CurrencyToVoteHandler<TotalIssuance>
+			network::CurrencyToVoteHandler<TotalIssuance>,
+			pallet_staking::ChainAccuracy,
 		>(
 			validator_count,
 			minimum_validator_count,
@@ -467,41 +580,13 @@ fn main() {
 			<network::CurrencyToVoteHandler<TotalIssuance> as Convert<Balance, u64>>::convert(b) as u128;
 
 		let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
-		let mut supports = build_support_map::<Balance, AccountId, _, network::CurrencyToVoteHandler<TotalIssuance>>(
-			&elected_stashes,
-			&assignments,
-			slashable_balance,
-		);
+
+		let staked_assignments = sp_phragmen::assignment_ratio_to_staked(assignments.clone(), slashable_balance);
+		let (mut supports, _) = build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice());
 
 		if iterations > 0 {
 			// prepare and run post-processing.
-			let mut staked_assignments
-			: Vec<(AccountId, Vec<PhragmenStakedAssignment<AccountId>>)>
-			= Vec::with_capacity(assignments.len());
-			for (n, assignment) in assignments.iter() {
-				let mut staked_assignment
-				: Vec<PhragmenStakedAssignment<AccountId>>
-				= Vec::with_capacity(assignment.len());
-				for (c, per_thing) in assignment.iter() {
-					let nominator_stake = to_votes(slashable_balance(n));
-					let other_stake = *per_thing * nominator_stake;
-					staked_assignment.push((c.clone(), other_stake));
-				}
-				staked_assignments.push((n.clone(), staked_assignment));
-			}
-
-			equalize::<
-				_,
-				_,
-				network::CurrencyToVoteHandler<TotalIssuance>,
-				_,
-			>(
-				staked_assignments,
-				&mut supports,
-				network::TOLERANCE,
-				iterations,
-				slashable_balance,
-			);
+			unimplemented!();
 		}
 
 		let phragmen_elapsed = start_phragmen.elapsed().as_millis();
@@ -511,14 +596,19 @@ fn main() {
 
 		println!("\n######################################\n+++ Winner Validators:");
 		for (i, s) in winners.iter().enumerate() {
-			println!("#{} == {} [{:?}]", i + 1, network::get_nick(&client, &s.0).await, s.0);
+			println!("#{} == {} [{:?}]", i + 1, network::get_nick(&s.0, &client, at).await, s.0);
 			let support = supports.get(&s.0).unwrap();
 			let others_sum: Balance = support.voters.iter().map(|(_n, s)| s).sum();
 			let other_count = support.voters.len();
 
+			assert_eq!(support.total, others_sum, "a support total has been wrong");
+
+			// let expo = staking_utils::exposure_of(&s.0, &client, at).await;
+			// assert_eq!(expo.total, support.total, "Exposure mismatch with on-chain data.");
+
 			println!(
 				"[stake_total: {:?}] [vote_count: {}] [ctrl: {:?}]",
-				KSM(others_sum),
+				KSM(support.total),
 				other_count,
 				staker_infos.get(&s.0).unwrap().ctrl,
 			);
@@ -540,8 +630,6 @@ fn main() {
 			}
 
 			println!("");
-
-			assert_eq!(others_sum, support.total);
 		};
 
 		if verbosity >= 2 {
@@ -570,6 +658,7 @@ fn main() {
 
 		println!("============================");
 		println!("++ connected to [{}]", uri);
+		println!("++ at [{}]", at);
 		println!("++ total_issuance = {:?}", KSM(total_issuance));
 		println!("++ candidates intentions count {:?}", candidates.len());
 		println!("++ voters intentions count {:?}", voters.len());

@@ -8,10 +8,10 @@ edition = "2018"
 async-std = "1.2.0"
 url = "1.7.0"
 futures = "0.3.1"
-hyper = "0.12"
 log = "0.4.8"
 env_logger = "0.7.1"
 separator = "0.4.1"
+hex = "0.4"
 codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
 jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee/", features = ["ws"] }
 serde = { version = "1.0.102", features = ["derive"] }
@@ -21,17 +21,25 @@ clap = "2.33.0"
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
 
 # Remote crates
-sc-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-sp-phragmen = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-support = { package = "frame-support", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-staking = { package = "pallet-staking", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
-sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master", features = ["std"] }
+# sc-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+# sp-phragmen = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+# sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+# support = { package = "frame-support", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+# staking = { package = "pallet-staking", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
+# sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master", features = ["std"] }
+
+# Remote custom
+# sc-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
+# sp-phragmen = { git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
+# sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
+# support = { package = "frame-support", git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
+# staking = { package = "pallet-staking", git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
+# sp-core = { git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4", features = ["std"] }
 
 # For local debug
-# sc-rpc-api = { path = "./../substrate/client/rpc-api" }
-# sp-phragmen = { path = "./../substrate/primitives/phragmen" }
-# sp-runtime = { path = "./../substrate/primitives/runtime" }
-# support = { path = "./../substrate/frame/support", package = "frame-support" }
-# staking = { path = "./../substrate/frame/staking", package = "pallet-staking" }
-# sp-core = { path = "./../substrate/primitives/core", features = ["std"] }
+sc-rpc-api = { path = "./../substrate/client/rpc-api" }
+sp-phragmen = { path = "./../substrate/primitives/phragmen" }
+sp-runtime = { path = "./../substrate/primitives/runtime" }
+frame-support = { path = "./../substrate/frame/support" }
+pallet-staking = { path = "./../substrate/frame/staking" }
+sp-core = { path = "./../substrate/primitives/core", features = ["std"] }
