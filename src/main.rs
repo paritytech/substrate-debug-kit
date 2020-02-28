@@ -21,23 +21,25 @@
 #![warn(unused_extern_crates)]
 
 use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
-use codec::Decode;
 use separator::Separatable;
 use clap::{Arg, App};
-use jsonrpsee::{Client, core::common::Params};
+use jsonrpsee::Client;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 pub use sc_rpc_api::state::StateClient;
 
 pub use polkadot_primitives::{Hash, Balance, AccountId, BlockNumber};
-use sp_core::storage::{StorageData, StorageKey};
-use sp_core::hashing::{blake2_256, twox_128};
 use sp_phragmen::{
-	elect, equalize, PhragmenResult, build_support_map,
+	elect, PhragmenResult, build_support_map,
 };
-use sp_runtime::traits::Convert;
-use frame_support::storage::generator::Linkage;
 
-// TODO: clean function interfaces: probably no more passing string.
+mod network;
+mod staking;
+mod elections_phragmen;
+mod storage;
+mod primitives;
+mod offchain_phragmen;
+#[macro_use]
+mod timing;
 
 /// A staker
 #[derive(Debug)]
@@ -65,317 +67,13 @@ impl fmt::Display for KSM {
 	}
 }
 
-// Total issuance.
-static mut ISSUANCE: *mut u128 = 0 as *mut u128;
-
-/// some helpers to create some storage keys.
-mod keys {
-	use super::{StorageKey, blake2_256, twox_128};
-
-	/// create key for a simple value.
-	pub fn value(module: String, storage: String) -> StorageKey {
-		let mut final_key = [0u8; 32];
-		final_key[0..16].copy_from_slice(&twox_128(module.as_bytes()));
-		final_key[16..32].copy_from_slice(&twox_128(storage.as_bytes()));
-		StorageKey(final_key.to_vec())
-	}
-
-	/// create key for a map.
-	pub fn map(module: String, storage: String, encoded_key: &[u8]) -> StorageKey {
-		let module_key = twox_128(module.as_bytes());
-		let storage_key = twox_128(storage.as_bytes());
-		let key = blake2_256(encoded_key);
-		let mut final_key = Vec::with_capacity(module_key.len() + storage_key.len() + key.len());
-		final_key.extend_from_slice(&module_key);
-		final_key.extend_from_slice(&storage_key);
-		final_key.extend_from_slice(&key);
-		StorageKey(final_key)
-	}
-
-	/// create key for a linked_map head.
-	pub fn linked_map_head(module: String, storage: String) -> StorageKey {
-		let head_prefix = "HeadOf".to_string() + &storage;
-		let mut final_key = [0u8; 32];
-		final_key[0..16].copy_from_slice(&twox_128(module.as_bytes()));
-		final_key[16..32].copy_from_slice(&twox_128(head_prefix.as_bytes()));
-		StorageKey(final_key.to_vec())
-	}
-}
-
-/// Some helpers to read storage.
-mod storage {
-	use jsonrpsee::{core::common::{to_value as to_json_value, Params}, Client};
-	use super::{StorageKey, StorageData, Decode, Hash, fmt::Debug, Linkage};
-	use super::keys;
-
-	/// Read from a raw key regardless of the type.
-	pub async fn read<T: Decode>(key: StorageKey, client: &Client, at: Hash) -> Option<T> {
-		let serialized_key = to_json_value(key).expect("StorageKey serialization infallible");
-		let at = to_json_value(at).expect("Block hash serialization infallible");
-		let raw: Option<StorageData> =
-			client.request("state_getStorage", Params::Array(vec![serialized_key, at]))
-				.await
-				.expect("Storage request failed");
-		let encoded = raw.map(|d| d.0)?;
-		<T as Decode>::decode(&mut encoded.as_slice()).ok()
-	}
-
-	/// enumerate and return all pairings of a linked map. Hopefully substrate will provide easier
-	/// ways of doing this in the future.
-	pub async fn enumerate_linked_map<K, T>(
-		module: String,
-		storage: String,
-		client: &Client,
-		at: Hash,
-	) -> Vec<(K, T)>
-		where K: Decode + Debug + Clone + AsRef<[u8]>, T: Decode + Clone + Debug,
-	{
-		let maybe_head_key = read::<K>(
-			keys::linked_map_head(
-				module.clone(),
-				storage.clone(),
-			),
-			&client,
-			at,
-		).await;
-
-		if let Some(head_key) = maybe_head_key {
-			let mut ptr = head_key;
-			let mut enumerations = Vec::<(K, T)>::new();
-			loop {
-				let (next_value, next_key) = read::<(T, Linkage<K>)>(
-					keys::map(
-						module.clone(),
-						storage.clone(),
-						ptr.as_ref(),
-					),
-					&client,
-					at,
-				).await.unwrap();
-
-				enumerations.push((
-					ptr,
-					next_value,
-				));
-
-				if let Some(next) = next_key.next {
-					ptr = next;
-				} else {
-					break;
-				}
-			}
-			enumerations
-		} else {
-			vec![]
-		}
-	}
-}
-
-/// Some implementations that need to be in sync with how the network is working. See the runtime
-/// of the node to which you are connecting for details.
-mod network {
-	use super::{Balance, Convert, Client, AccountId, Hash};
-	use super::{storage, keys};
-
-	/// a way to attach the total issuance to `CurrencyToVoteHandler`.
-	pub trait GetTotalIssuance {
-		fn get_total_issuance() -> Balance;
-	}
-
-	pub struct CurrencyToVoteHandler<T>(std::marker::PhantomData<T>);
-	impl<T: GetTotalIssuance> CurrencyToVoteHandler<T> {
-		fn factor() -> u128 {
-			(T::get_total_issuance() / u64::max_value() as u128).max(1)
-		}
-	}
-
-	impl<T: GetTotalIssuance> Convert<u128, u64> for CurrencyToVoteHandler<T> {
-		fn convert(x: Balance) -> u64 { (x / Self::factor()) as u64 }
-	}
-
-	impl<T: GetTotalIssuance> Convert<u128, u128> for CurrencyToVoteHandler<T> {
-		fn convert(x: u128) -> Balance { x * Self::factor() }
-	}
-
-	pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
-		let nick = storage::read::<(Vec<u8>, Balance)>(
-			keys::map("Sudo".to_string(), "NameOf".to_string(), who.as_ref()),
-			client,
-			at,
-		).await;
-
-		if nick.is_some() {
-			String::from_utf8(nick.unwrap().0).unwrap()
-		} else {
-			String::from("NO_NICK")
-		}
-	}
-}
-
-mod staking_utils {
-	use super::{AccountId, storage, keys, Staker, Balance, Client, Hash};
-	use pallet_staking::{ValidatorPrefs, Nominations, StakingLedger, Exposure, EraIndex};
-
-	// TODO: remove later once this is public
-	type SpanIndex = u32;
-
-	#[derive(codec::Encode, codec::Decode, Debug)]
-	pub struct SlashingSpans {
-		span_index: SpanIndex,
-		last_start: EraIndex,
-		last_nonzero_slash: EraIndex,
-		prior: Vec<EraIndex>,
-	}
-
-	impl SlashingSpans {
-		pub(crate) fn last_nonzero_slash(&self) -> EraIndex {
-			self.last_nonzero_slash
-		}
-	}
-
-	pub async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
-		storage::enumerate_linked_map::<
-			AccountId,
-			ValidatorPrefs,
-		>(
-			"Staking".to_string(),
-			"Validators".to_string(),
-			client,
-			at,
-		).await.into_iter().map(|(v, _p)| v).collect::<Vec<AccountId>>()
-	}
-
-	pub async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>)> {
-		let nominators: Vec<(AccountId, Nominations<AccountId>)> = storage::enumerate_linked_map::<
-			AccountId,
-			Nominations<AccountId>,
-		>(
-			"Staking".to_string(),
-			"Nominators".to_string(),
-			client,
-			at,
-		).await;
-
-		nominators
-			.into_iter()
-			.map(|(who, n)| {
-				let submitted_in = n.submitted_in;
-				let mut targets = n.targets;
-				targets.retain(|target| {
-					let maybe_slashing_spans = async_std::task::block_on(
-						slashing_span_of(&target, client, at)
-					);
-					dbg!(&maybe_slashing_spans);
-					maybe_slashing_spans.map_or(
-						true,
-						|spans| submitted_in >= spans.last_nonzero_slash(),
-					)
-				});
-
-				(who, targets)
-			})
-			.collect::<Vec<(AccountId, Vec<AccountId>)>>()
-	}
-
-	pub async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> Staker {
-		let ctrl = storage::read::<AccountId>(
-			keys::map("Staking".to_string(), "Bonded".to_string(), stash.as_ref()),
-			&client,
-			at,
-		).await.expect("All stakers must have a ledger.");
-
-		let ledger = storage::read::<StakingLedger<AccountId, Balance>>(
-			keys::map("Staking".to_string(), "Ledger".to_string(), ctrl.as_ref()),
-			&client,
-			at,
-		).await.expect("All stakers must have a ledger.");
-
-		Staker { ctrl: Some(ctrl), stake: ledger.active }
-	}
-
-	pub async fn slashing_span_of(stash: &AccountId, client: &Client, at: Hash)
-		-> Option<SlashingSpans>
-	{
-		storage::read::<SlashingSpans>(
-			keys::map("Staking".to_string(), "SlashingSpans".to_string(), stash.as_ref()),
-			&client,
-			at,
-		).await
-	}
-
-	pub async fn exposure_of(stash: &AccountId, client: &Client, at: Hash)
-		-> Exposure<AccountId, Balance>
-	{
-		storage::read::<Exposure<AccountId, Balance>>(
-			keys::map("Staking".to_string(), "Stakers".to_string(), stash.as_ref()),
-			&client,
-			at,
-		).await.expect("All stakers must have a exposure.")
-	}
-}
-
-mod election_utils {
-	use super::{AccountId, storage, keys, Staker, Balance, Client, Hash};
-	const MODULE: &'static str = "PhragmenElection";
-
-	pub async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
-		let mut members = storage::read::<Vec<(AccountId, Balance)>>(
-			keys::value(MODULE.to_string(), "Members".to_string()),
-			client,
-			at,
-		).await.unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
-
-		let runners = storage::read::<Vec<(AccountId, Balance)>>(
-			keys::value(MODULE.to_string(), "RunnersUp".to_string()),
-			client,
-			at,
-		).await.unwrap_or_default().into_iter().map(|(m, _)| m).collect::<Vec<AccountId>>();
-
-		let candidates = storage::read::<Vec<AccountId>>(
-			keys::value(MODULE.to_string(), "Candidates".to_string()),
-			client,
-			at,
-		).await.unwrap_or_default();
-
-		members.extend(candidates);
-		members.extend(runners);
-
-		members
-	}
-
-	pub async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>)> {
-		storage::enumerate_linked_map::<
-			AccountId,
-			Vec<AccountId>,
-		>(
-			MODULE.to_string(),
-			"VotesOf".to_string(),
-			client,
-			at,
-		)
-			.await
-			.into_iter()
-			.collect::<Vec<(AccountId, Vec<AccountId>)>>()
-	}
-
-	pub async fn get_staker_info_entry(voter: &AccountId, client: &Client, at: Hash) -> Staker {
-		let stake = storage::read::<Balance>(
-			keys::map(MODULE.to_string(), "StakeOf".to_string(), voter.as_ref()),
-			&client,
-			at,
-		).await.unwrap_or_default();
-
-		Staker { ctrl: None, stake }
-	}
-}
-
 fn main() {
 	env_logger::try_init().ok();
 
 	let matches = App::new("offline-phragmen")
 		.version("0.1")
 		.author("Kian Paimani <kian@parity.io>")
-		.about("Runs the phragmen election algorithm of any substrate chain with staking module offline (aka. off the chain) and predicts the results.")
+		.about("Runs the phragmen election algorithm of any substrate chain offline and predicts the results.")
 		.arg(Arg::with_name("uri")
 			.short("u")
 			.long("uri")
@@ -475,13 +173,7 @@ fn main() {
 			.into();
 
 		// get the latest block hash
-		let head = {
-			let data: Option<StorageData> = client.request("chain_getFinalizedHead", Params::None)
-				.await
-				.expect("Storage request failed");
-			let now_raw = data.expect("Should always get the head hash").0;
-			<Hash as Decode>::decode(&mut &*now_raw).expect("Block hash should decode")
-		};
+		let head = network::get_head(&client).await;
 
 		// potentially replace with the given hash
 		let at: Hash = if let Some(at) = maybe_at {
@@ -491,65 +183,45 @@ fn main() {
 		};
 
 		// Get the total issuance and update the global pointer to it.
-		let maybe_total_issuance = storage::read::<Balance>(
-			keys::value(
-				"Balances".to_string(),
-				"TotalIssuance".to_string()
-			),
-			&client,
-			at,
-		).await;
-
-		struct TotalIssuance;
-		impl network::GetTotalIssuance for TotalIssuance {
-			fn get_total_issuance() -> Balance {
-				unsafe {
-					*ISSUANCE
-				}
-			}
-		}
-
-		let mut total_issuance = maybe_total_issuance.unwrap_or(0);
-		unsafe { ISSUANCE = &mut total_issuance; }
+		let mut total_issuance = network::get_total_issuance(&client, at).await;
+		unsafe { network::ISSUANCE = &mut total_issuance; }
 
 		set_default_ss58_version(addr_format);
 
-		// start file scraping timer.
-		let start_data = std::time::Instant::now();
-
+		t_start!(data_scrape);
 		// stash key of all wannabe candidates.
 		let candidates = if do_elections {
-			election_utils::get_candidates(&client, at).await
+			elections_phragmen::get_candidates(&client, at).await
 		} else {
-			staking_utils::get_candidates(&client, at).await
+			staking::get_candidates(&client, at).await
 		};
 
-		// stash key of current nominators
-		let mut voters = if do_elections {
-			election_utils::get_voters(&client, at).await
+		// stash key of current voters, including maybe self vote.
+		let mut all_voters = if do_elections {
+			elections_phragmen::get_voters(&client, at).await
 		} else {
-			staking_utils::get_voters(&client, at).await
+			staking::get_voters(&client, at).await
 		};
 
 		// add self-vote
 		if do_self_vote {
 			candidates.iter().for_each(|v| {
 				let self_vote = (v.clone(), vec![v.clone()]);
-				voters.push(self_vote);
+				all_voters.push(self_vote);
 			});
 		}
 
 		// get the slashable balance of every entity
 		let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
 
-		let mut all_stakers= candidates.clone();
-		all_stakers.extend(voters.iter().map(|(n, _)| n.clone()).collect::<Vec<AccountId>>());
-		for stash in all_stakers.iter() {
+		let mut targets = candidates.clone();
+		targets.extend(all_voters.iter().map(|(n, _)| n.clone()).collect::<Vec<AccountId>>());
+		for stash in targets.iter() {
 			let staker_info =
 				if do_elections {
-					election_utils::get_staker_info_entry(&stash, &client, at).await
+					elections_phragmen::get_staker_info_entry(&stash, &client, at).await
 				} else {
-					staking_utils::get_staker_info_entry(&stash, &client, at).await
+					staking::get_staker_info_entry(&stash, &client, at).await
 				};
 			staker_infos.insert(stash.clone(), staker_info);
 		};
@@ -557,44 +229,44 @@ fn main() {
 		let slashable_balance = |who: &AccountId| -> Balance {
 			staker_infos.get(who).unwrap().stake
 		};
+		t_stop!(data_scrape);
 
 		// run phragmen
-		let data_elapsed = start_data.elapsed().as_millis();
-		let start_phragmen = std::time::Instant::now();
-
+		t_start!(phragmen_run);
 		let PhragmenResult { winners, assignments } = elect::<
 			AccountId,
 			Balance,
 			_,
-			network::CurrencyToVoteHandler<TotalIssuance>,
+			network::CurrencyToVoteHandler<network::TotalIssuance>,
 			pallet_staking::ChainAccuracy,
 		>(
 			validator_count,
 			minimum_validator_count,
 			candidates.clone(),
-			voters.clone(),
+			all_voters.clone(),
 			slashable_balance,
 		).ok_or("Phragmen failed to elect.").unwrap();
-
-		let to_votes = |b: Balance|
-			<network::CurrencyToVoteHandler<TotalIssuance> as Convert<Balance, u64>>::convert(b) as u128;
+		t_stop!(phragmen_run);
 
 		let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
 
+		t_start!(ratio_into_staked_run);
 		let staked_assignments = sp_phragmen::assignment_ratio_to_staked(assignments.clone(), slashable_balance);
-		let (mut supports, _) = build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice());
+		t_stop!(ratio_into_staked_run);
+
+		t_start!(build_support_map_run);
+		let (supports, _) = build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice());
+		t_stop!(build_support_map_run);
 
 		if iterations > 0 {
 			// prepare and run post-processing.
 			unimplemented!();
 		}
 
-		let phragmen_elapsed = start_phragmen.elapsed().as_millis();
-
 		let mut slot_stake = u128::max_value();
 		let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
 
-		println!("\n######################################\n+++ Winner Validators:");
+		println!("+++ Winner Validators:");
 		for (i, s) in winners.iter().enumerate() {
 			println!("#{} == {} [{:?}]", i + 1, network::get_nick(&s.0, &client, at).await, s.0);
 			let support = supports.get(&s.0).unwrap();
@@ -603,8 +275,25 @@ fn main() {
 
 			assert_eq!(support.total, others_sum, "a support total has been wrong");
 
-			// let expo = staking_utils::exposure_of(&s.0, &client, at).await;
-			// assert_eq!(expo.total, support.total, "Exposure mismatch with on-chain data.");
+			let expo = staking::exposure_of(&s.0, &client, at).await;
+			if support.total != expo.total {
+				log::warn!(
+					target: "offline_phragmen",
+					"exposure mismatch with on-chain data, expo.total = {:?} - support.total = {:?} diff = {}",
+					expo.total,
+					support.total,
+					if support.total > expo.total {
+						format!("+{}", KSM(support.total - expo.total))
+					} else {
+						format!("-{}", KSM(expo.total - support.total))
+					}
+				);
+			} else {
+				log::debug!(
+					target: "offline_phragmen",
+					"exposure matches with on-chain data.",
+				)
+			}
 
 			println!(
 				"[stake_total: {:?}] [vote_count: {}] [ctrl: {:?}]",
@@ -629,11 +318,11 @@ fn main() {
 				});
 			}
 
-			println!("");
+			println!("\n");
 		};
 
 		if verbosity >= 2 {
-			println!("\n######################################\n+++ Updated Assignments:");
+			println!("+++ Assignments:");
 			let mut counter = 1;
 			for (nominator, info) in nominator_info.iter() {
 				let staker_info = staker_infos.get(&nominator).unwrap();
@@ -656,13 +345,22 @@ fn main() {
 			}
 		}
 
-		println!("============================");
-		println!("++ connected to [{}]", uri);
-		println!("++ at [{}]", at);
-		println!("++ total_issuance = {:?}", KSM(total_issuance));
-		println!("++ candidates intentions count {:?}", candidates.len());
-		println!("++ voters intentions count {:?}", voters.len());
-		println!(
+		let compact = offchain_phragmen::prepare_offchain_submission(
+			validator_count,
+			minimum_validator_count,
+			candidates.clone(),
+			all_voters.clone(),
+			staker_infos,
+			&client,
+			at,
+		).await;
+
+		eprintln!("++ connected to [{}]", uri);
+		eprintln!("++ at [{}]", at);
+		eprintln!("++ total_issuance = {:?}", KSM(total_issuance));
+		eprintln!("++ validator intentions count {:?}", candidates.len());
+		eprintln!("++ nominator intentions count {:?}", all_voters.len() - candidates.len());
+		eprintln!(
 			"++ args: [count to elect = {}] [min-count = {}] [output = {:?}] [iterations = {}] [do_self_vote {}] [do_elections {}]",
 			validator_count,
 			minimum_validator_count,
@@ -671,10 +369,9 @@ fn main() {
 			do_self_vote,
 			do_elections,
 		);
-		println!("++ final slot_stake {:?}", KSM(slot_stake));
-		println!("++ Data fetch Completed in {} ms.", data_elapsed);
-		println!("++ Phragmen Completed in {} ms.", phragmen_elapsed);
-		println!("++ Phragmen Assignment size {} bytes.", codec::Encode::encode(&assignments).len());
+		eprintln!("++ final slot_stake {:?}", KSM(slot_stake));
+		eprintln!("++ Phragmen Assignment size {} bytes.", codec::Encode::encode(&assignments).len());
+		eprintln!("++ Phragmen compact Assignment size {} bytes.", codec::Encode::encode(&compact).len());
 
 		// potentially write to json file
 		if let Some(output_file) = maybe_output_file {
