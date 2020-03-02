@@ -22,7 +22,7 @@
 
 use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
 use separator::Separatable;
-use clap::{Arg, App};
+use clap::{App, load_yaml};
 use jsonrpsee::Client;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 pub use sc_rpc_api::state::StateClient;
@@ -70,60 +70,9 @@ impl fmt::Display for KSM {
 fn main() {
 	env_logger::try_init().ok();
 
-	let matches = App::new("offline-phragmen")
-		.version("0.1")
-		.author("Kian Paimani <kian@parity.io>")
-		.about("Runs the phragmen election algorithm of any substrate chain offline and predicts the results.")
-		.arg(Arg::with_name("uri")
-			.short("u")
-			.long("uri")
-			.help("websockets uri of the substrate node. Default is ws://localhost:9944.")
-			.takes_value(true)
-		).arg(Arg::with_name("count")
-			.short("c")
-			.long("count")
-			.help("count of member/validators to elect. Default is 50.")
-			.takes_value(true)
-		).arg(Arg::with_name("network")
-			.short("n")
-			.long("network")
-			.help("network address format. Can be kusama|polkadot|substrate. Default is kusama.")
-			.takes_value(true)
-		).arg(Arg::with_name("output")
-			.short("o")
-			.long("output")
-			.help("json output file name. dumps the results into if given.")
-			.takes_value(true)
-		).arg(Arg::with_name("min-count")
-			.short("m")
-			.long("min-count")
-			.help("minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.")
-			.takes_value(true)
-		).arg(Arg::with_name("iterations")
-			.short("i")
-			.long("iters")
-			.help("number of post-processing iterations to run. Default is 0")
-			.takes_value(true)
-		).arg(Arg::with_name("at")
-			.short("a")
-			.long("at")
-			.help("scrape the data at the given block hash. Default will be the head of the chain")
-			.takes_value(true)
-		).arg(Arg::with_name("no-self-vote")
-			.short("s")
-			.long("no-self-vote")
-			.help("disable self voting for candidates")
-		).arg(Arg::with_name("elections")
-			.short("e")
-			.long("elections")
-			.help("execute the council election.")
-		).arg(Arg::with_name("verbose")
-			.short("v")
-			.multiple(true)
-			.long("verbose")
-			.help("Print more output")
-		)
-	.get_matches();
+	let yaml = load_yaml!("../cli.yml");
+	let app = App::from(yaml);
+	let matches = app.get_matches();
 
 	let uri = matches.value_of("uri")
 		.unwrap_or("ws://localhost:9944")

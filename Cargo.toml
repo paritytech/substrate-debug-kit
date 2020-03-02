@@ -16,7 +16,7 @@ codec = { package = "parity-scale-codec", version = "1.0.6", default-features = 
 jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee/", features = ["ws"] }
 serde = { version = "1.0.102", features = ["derive"] }
 serde_json = { version = "1.0" }
-clap = "2.33.0"
+clap = { version = "2.33.0", features = ["yaml"] }
 
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
 
