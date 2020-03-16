@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-//! An extended version of the code in `substrate/node/rpc-client/` which reads the staking info
-//! of a chain and runs the phragmen election with the given parameters offline.
+//! A Rust RPC client for a substrate node with utility snippets to scrape the node's data and run
+//! function on top of them.
 
 #![warn(missing_docs)]
 #![warn(unused_extern_crates)]
+
+// whatever node you are connecting to. Polkadot, substrate etc.
+pub use primitives::{Hash, Balance, AccountId, BlockNumber};
 
 use std::{fmt, fmt::Debug, collections::BTreeMap, convert::TryInto};
 use separator::Separatable;
@@ -26,11 +29,10 @@ use clap::{App, load_yaml};
 use jsonrpsee::Client;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 pub use sc_rpc_api::state::StateClient;
-
-pub use polkadot_primitives::{Hash, Balance, AccountId, BlockNumber};
 use sp_phragmen::{
 	elect, PhragmenResult, build_support_map,
 };
+use node_runtime::{Runtime, Staking, Balances};
 
 mod network;
 mod staking;
@@ -38,11 +40,12 @@ mod elections_phragmen;
 mod storage;
 mod primitives;
 mod offchain_phragmen;
+mod mock;
 #[macro_use]
 mod timing;
 
 /// A staker
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Staker {
 	ctrl: Option<AccountId>,
 	stake: Balance,
@@ -78,15 +81,24 @@ fn main() {
 		.unwrap_or("ws://localhost:9944")
 		.to_string();
 
-	let validator_count = matches.value_of("count")
+	let validator_count = matches
+		.subcommand_matches("phragmen")
+		.unwrap()
+		.value_of("count")
 		.unwrap_or("50")
 		.parse()
 		.unwrap();
-	let minimum_validator_count = matches.value_of("min-count")
+	let minimum_validator_count = matches
+		.subcommand_matches("phragmen")
+		.unwrap()
+		.value_of("min-count")
 		.unwrap_or("0")
 		.parse()
 		.unwrap();
-	let iterations: usize = matches.value_of("iterations")
+	let iterations: usize = matches
+		.subcommand_matches("phragmen")
+		.unwrap()
+		.value_of("iterations")
 		.unwrap_or("0")
 		.parse()
 		.unwrap();
@@ -116,10 +128,10 @@ fn main() {
 
 	async_std::task::block_on(async {
 		// connect to a node.
-		let client: Client = jsonrpsee::ws::ws_raw_client(&uri)
+		let transport = jsonrpsee::transport::ws::WsTransportClient::new(&uri)
 			.await
-			.expect("Failed to connect to client")
-			.into();
+			.expect("Failed to connect to client");
+		let client: Client = jsonrpsee::raw::RawClient::new(transport).into();
 
 		// get the latest block hash
 		let head = network::get_head(&client).await;
@@ -267,7 +279,7 @@ fn main() {
 				});
 			}
 
-			println!("\n");
+			println!("");
 		};
 
 		if verbosity >= 2 {
@@ -299,10 +311,43 @@ fn main() {
 			minimum_validator_count,
 			candidates.clone(),
 			all_voters.clone(),
-			staker_infos,
+			staker_infos.clone(),
 			&client,
 			at,
 		).await;
+
+
+		mock::empty_ext_with_runtime::<Runtime>().execute_with(|| {
+			use frame_support::traits::{Currency, StoredMap};
+			use frame_support::assert_ok;
+			use frame_support::storage::StorageValue;
+			use sp_runtime::traits::Dispatchable;
+
+			for c in candidates.clone() {
+				let e = staker_infos.get(&c).unwrap();
+				let ctrl = e.ctrl.as_ref().unwrap();
+				let stake = e.stake;
+				Balances::make_free_balance_be(&c, stake);
+
+				let call = node_runtime::Call::Staking(pallet_staking::Call::bond(
+					pallet_indices::Address::<Runtime>::Id(ctrl.clone()),
+					stake,
+					Default::default(),
+				));
+				println!("Bonding {:?}/{:?} with {:?}", &c, &ctrl, &stake);
+				let o = frame_system::Origin::<Runtime>::Signed(c);
+				assert_ok!(Dispatchable::dispatch(call, o.into()));
+
+				<pallet_staking::EraElectionStatus<Runtime>>::put(pallet_staking::ElectionStatus::Open(1));
+			}
+
+			Staking::check_and_replace_solution(
+				Default::default(),
+				compact.clone(),
+				pallet_staking::ElectionCompute::OnChain,
+				Default::default(),
+			);
+		});
 
 		eprintln!("++ connected to [{}]", uri);
 		eprintln!("++ at [{}]", at);

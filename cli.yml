@@ -1,7 +1,7 @@
 name: staking-lab
 version: "1.0"
 author: kianenigma <kian@parity.io>
-about: Runs some Phragmen related scripts with the scraped data of a substrate chain
+about: Diognastic lab for substrate staking.
 args:
     - uri:
         short: u
@@ -53,7 +53,7 @@ subcommands:
                 long: no-self-vote
                 help: disable self voting for candidates
                 takes_value: true
-            - council:
-                long: council
-                help: execute the council election
+            - module:
+                long: module
+                help: which module to execute. Default is staking
                 takes_value: true

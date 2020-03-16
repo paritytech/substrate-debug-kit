@@ -1,11 +1,22 @@
 //! Helpers to read staking module.
 
-use pallet_staking::{ValidatorPrefs, Nominations, StakingLedger, Exposure};
+use codec::{HasCompact, Encode, Decode};
+use pallet_staking::{ValidatorPrefs, Nominations, Exposure, UnlockChunk};
 use pallet_staking::slashing::{SlashingSpans};
 use crate::{
 	storage, Client, Staker,
 	primitives::{AccountId, Balance, Hash},
 };
+
+#[derive(Encode, Decode)]
+pub struct StakingLedger<AccountId, Balance: HasCompact> {
+	pub stash: AccountId,
+	#[codec(compact)]
+	pub total: Balance,
+	#[codec(compact)]
+	pub active: Balance,
+	pub unlocking: Vec<UnlockChunk<Balance>>,
+}
 
 const MODULE: &'static str = "Staking";
 

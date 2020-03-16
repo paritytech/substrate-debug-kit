@@ -13,12 +13,14 @@ env_logger = "0.7.1"
 separator = "0.4.1"
 hex = "0.4"
 codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
-jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee/", features = ["ws"] }
+jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee/", rev = "a0bea41c4f37125fa742ec48b12e11cf55c592b5", features = ["ws"] }
 serde = { version = "1.0.102", features = ["derive"] }
 serde_json = { version = "1.0" }
 clap = { version = "2.33.0", features = ["yaml"] }
 
-polkadot-primitives = { git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
+# polkadot-primitives = { git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
+# polkadot-primitives = { package = "node-primitives", git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
+node-primitives = { path = "./../substrate/bin/node/primitives" }
 
 # Remote crates
 # sc-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
@@ -40,6 +42,10 @@ polkadot-primitives = { git = "https://github.com/paritytech/polkadot", rev = "f
 sc-rpc-api = { path = "./../substrate/client/rpc-api" }
 sp-phragmen = { path = "./../substrate/primitives/phragmen" }
 sp-runtime = { path = "./../substrate/primitives/runtime" }
+sp-core = { path = "./../substrate/primitives/core" }
+sp-io = { path = "./../substrate/primitives/io" }
 frame-support = { path = "./../substrate/frame/support" }
-pallet-staking = { path = "./../substrate/frame/staking" }
-sp-core = { path = "./../substrate/primitives/core", features = ["std"] }
+pallet-staking = { path = "./../substrate/frame/staking", features = ["testing-utils"] }
+pallet-indices = { path = "./../substrate/frame/indices" }
+frame-system = { path = "./../substrate/frame/system" }
+node-runtime = { path = "./../substrate/bin/node/runtime" }

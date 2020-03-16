@@ -1,4 +1,4 @@
-use jsonrpsee::core::common::Params;
+use jsonrpsee::common::Params;
 use codec::Decode;
 use sp_runtime::traits::Convert;
 use sp_core::storage::StorageData;

@@ -4,7 +4,7 @@ use crate::{
 };
 use std::convert::TryInto;
 use std::collections::BTreeMap;
-use pallet_staking::Compact;
+use pallet_staking::CompactAssignments as Compact;
 use sp_phragmen::{PhragmenResult, build_support_map, evaluate_support, elect, reduce};
 
 pub async fn prepare_offchain_submission(
@@ -82,7 +82,7 @@ pub async fn prepare_offchain_submission(
 	};
 
 	// compact encode the assignment.
-	let compact = pallet_staking::Compact::from_assignment(
+	let compact = pallet_staking::CompactAssignments::from_assignment(
 		low_accuracy_assignment,
 		nominator_index,
 		validator_index,
