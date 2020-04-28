@@ -7,16 +7,16 @@ edition = "2018"
 [dependencies]
 async-std = "1.2.0"
 url = "1.7.0"
-futures = "0.3.1"
 log = "0.4.8"
 env_logger = "0.7.1"
 separator = "0.4.1"
 hex = "0.4"
-codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
+codec = { package = "parity-scale-codec", version = "1.3.0", default-features = false, features = ["derive"] }
 jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee/", rev = "a0bea41c4f37125fa742ec48b12e11cf55c592b5", features = ["ws"] }
 serde = { version = "1.0.102", features = ["derive"] }
 serde_json = { version = "1.0" }
 clap = { version = "2.33.0", features = ["yaml"] }
+lazy_static = "1.4.0"
 
 # polkadot-primitives = { git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
 # polkadot-primitives = { package = "node-primitives", git = "https://github.com/paritytech/polkadot", rev = "f23ce3e9184153f923139f33d1b05f92c62e3a7b" }
@@ -30,14 +30,6 @@ node-primitives = { path = "./../substrate/bin/node/primitives" }
 # staking = { package = "pallet-staking", git = "https://github.com/paritytech/substrate", branch = "polkadot-master" }
 # sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-master", features = ["std"] }
 
-# Remote custom
-# sc-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
-# sp-phragmen = { git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
-# sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
-# support = { package = "frame-support", git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
-# staking = { package = "pallet-staking", git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4" }
-# sp-core = { git = "https://github.com/paritytech/substrate", branch = "kiz-offchain-phragmen-4", features = ["std"] }
-
 # For local debug
 sc-rpc-api = { path = "./../substrate/client/rpc-api" }
 sp-phragmen = { path = "./../substrate/primitives/phragmen" }
@@ -45,7 +37,8 @@ sp-runtime = { path = "./../substrate/primitives/runtime" }
 sp-core = { path = "./../substrate/primitives/core" }
 sp-io = { path = "./../substrate/primitives/io" }
 frame-support = { path = "./../substrate/frame/support" }
-pallet-staking = { path = "./../substrate/frame/staking", features = ["testing-utils"] }
+pallet-staking = { path = "./../substrate/frame/staking" }
+pallet-identity = { path = "./../substrate/frame/identity" }
 pallet-indices = { path = "./../substrate/frame/indices" }
 frame-system = { path = "./../substrate/frame/system" }
 node-runtime = { path = "./../substrate/bin/node/runtime" }

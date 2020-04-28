@@ -1,75 +1,120 @@
-use jsonrpsee::common::Params;
-use codec::Decode;
-use sp_runtime::traits::Convert;
-use sp_core::storage::StorageData;
-use crate::primitives::{Balance, AccountId, Hash};
+use crate::primitives::{AccountId, Balance, Hash};
 use crate::{storage, Client};
+use codec::Decode;
+use jsonrpsee::common::Params;
+use lazy_static::lazy_static;
+use sp_core::storage::StorageData;
+use sp_runtime::traits::Convert;
+use std::sync::Mutex;
 
-// Total issuance.
-pub static mut ISSUANCE: *mut u128 = 0 as *mut u128;
-
-/// a way to attach the total issuance to `CurrencyToVoteHandler`.
-pub trait GetTotalIssuance {
-	fn get_total_issuance() -> Balance;
+lazy_static! {
+	static ref ISSUANCE: Mutex<Balance> = Mutex::new(0);
 }
 
-/// Something that holds the total issuance.
-pub struct TotalIssuance;
+/// Deals with total issuance
+pub mod issuance {
+	use super::{get_total_issuance, ISSUANCE};
+	use crate::{Balance, Client, Hash};
 
-impl GetTotalIssuance for TotalIssuance {
-	fn get_total_issuance() -> Balance {
-		unsafe {
-			*ISSUANCE
-		}
+	/// Get the previously set total issuance.
+	pub fn get() -> Balance {
+		ISSUANCE.lock().unwrap().clone()
+	}
+
+	/// Set the total issuance. Any code wanting to use `CurrencyToVoteHandler` must call this first
+	/// to set correct value in the global pointer.
+	pub async fn set(client: &Client, at: Hash) {
+		let total_issuance = get_total_issuance(client, at).await;
+		*ISSUANCE.lock().unwrap() = total_issuance;
 	}
 }
 
-pub struct CurrencyToVoteHandler<T>(std::marker::PhantomData<T>);
-impl<T: GetTotalIssuance> CurrencyToVoteHandler<T> {
+pub struct CurrencyToVoteHandler;
+impl CurrencyToVoteHandler {
 	fn factor() -> u128 {
-		(T::get_total_issuance() / u64::max_value() as u128).max(1)
+		(issuance::get() / u64::max_value() as u128).max(1)
 	}
 }
 
-impl<T: GetTotalIssuance> Convert<u128, u64> for CurrencyToVoteHandler<T> {
-	fn convert(x: Balance) -> u64 { (x / Self::factor()) as u64 }
+impl Convert<u128, u64> for CurrencyToVoteHandler {
+	fn convert(x: Balance) -> u64 {
+		(x / Self::factor()) as u64
+	}
 }
 
-impl<T: GetTotalIssuance> Convert<u128, u128> for CurrencyToVoteHandler<T> {
-	fn convert(x: u128) -> Balance { x * Self::factor() }
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+	fn convert(x: u128) -> Balance {
+		x * Self::factor()
+	}
 }
 
+/// Get the nick of a given account id.
+///
+/// seemingly DEPRECATED.
+#[allow(dead_code)]
 pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
 	let nick = storage::read::<(Vec<u8>, Balance)>(
-		storage::map("Sudo".to_string(), "NameOf".to_string(), who.as_ref()),
+		storage::map_key::<frame_support::Twox64Concat>(
+			"Nicks".to_string(),
+			"NameOf".to_string(),
+			who.as_ref(),
+		),
 		client,
 		at,
-	).await;
+	)
+	.await;
 
 	if nick.is_some() {
 		String::from_utf8(nick.unwrap().0).unwrap()
 	} else {
-		String::from("NO_NICK")
+		String::from("[NO_NICK]")
 	}
 }
 
+pub async fn get_identity(who: &AccountId, client: &Client, at: Hash) -> String {
+	use pallet_identity::{Data, Registration};
+	let maybe_identity = storage::read::<Registration<Balance>>(
+		storage::map_key::<frame_support::Twox64Concat>(
+			"Identity".to_string(),
+			"IdentityOf".to_string(),
+			who.as_ref(),
+		),
+		client,
+		at,
+	)
+	.await;
+
+	if let Some(identity) = maybe_identity {
+		let info = identity.info;
+		let display = info.display;
+
+		match display {
+			Data::Raw(bytes) => String::from_utf8(bytes).expect("Identity not utf-8"),
+			_ => "OPAQUE_IDENTITY".to_string(),
+		}
+	} else {
+		"NO_IDENT".to_string()
+	}
+}
+
+/// Get the latest finalized head of the chain.
 pub async fn get_head(client: &Client) -> Hash {
-	let data: Option<StorageData> = client.request("chain_getFinalizedHead", Params::None)
+	let data: Option<StorageData> = client
+		.request("chain_getFinalizedHead", Params::None)
 		.await
 		.expect("Storage request failed");
 	let now_raw = data.expect("Should always get the head hash").0;
 	<Hash as Decode>::decode(&mut &*now_raw).expect("Block hash should decode")
 }
 
-pub async fn get_total_issuance(client: &Client, at: Hash) -> Balance {
+/// Get total issuance of the chain.
+async fn get_total_issuance(client: &Client, at: Hash) -> Balance {
 	let maybe_total_issuance = storage::read::<Balance>(
-		storage::value(
-			"Balances".to_string(),
-			"TotalIssuance".to_string()
-		),
+		storage::value_key("Balances".to_string(), "TotalIssuance".to_string()),
 		&client,
 		at,
-	).await;
+	)
+	.await;
 
 	maybe_total_issuance.unwrap_or(0)
 }

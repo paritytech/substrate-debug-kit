@@ -25,8 +25,35 @@ args:
         help: Print more output
 
 subcommands:
-    - phragmen:
-        about: Runs the phragmen election.
+    - staking:
+        about: Runs the phragmen election for staking validators and nominators.
+        args:
+            - count:
+                short: c
+                long: count
+                help: count of member/validators to elect. Default is `Staking.validatorCount`.
+                takes_value: true
+            - min-count:
+                short: m
+                long: min-count
+                help: minimum number of members/validators to elect. If less candidates are available, phragmen will go south. Default is 0.
+                takes_value: true
+            - output:
+                short: o
+                long: output
+                help: json output file name. dumps the results into if given
+                takes_value: true
+            - iterations:
+                short: i
+                long: iterations
+                help: number of post-processing iterations to run. Default is 0
+                takes_value: true
+            - check-exposures:
+                long: check-exposures
+                help: check on-chain exposures at the given era with support values computed locally. This will most often only work at block number right after an election. The era must be provided. if you put 0, then it will resolve to `Staking::current_era()`.
+                takes_value: true
+    - council:
+        about: Runs the phragmen election for the elections-phragmen module (usually used for council).
         args:
             - count:
                 short: c
@@ -47,13 +74,4 @@ subcommands:
                 short: i
                 long: iterations
                 help: number of post-processing iterations to run. Default is 0
-                takes_value: true
-            - no-self-vote:
-                short: s
-                long: no-self-vote
-                help: disable self voting for candidates
-                takes_value: true
-            - module:
-                long: module
-                help: which module to execute. Default is staking
                 takes_value: true

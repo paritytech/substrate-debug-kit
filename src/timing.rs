@@ -10,10 +10,11 @@ macro_rules! t_start {
 #[macro_export]
 macro_rules! t_stop {
 	($name:tt) => {
-		eprintln!(
-			"++ {} took {}ms.",
+		log::debug!(
+			target: crate::LOG_TARGET,
+			"⏳ {} took {}ms.",
 			stringify!($name),
 			$name.elapsed().as_millis(),
-		)
+			)
 	};
 }
