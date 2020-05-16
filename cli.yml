@@ -1,7 +1,7 @@
-name: staking-lab
+name: offline-phragmen
 version: "1.0"
-author: kianenigma <kian@parity.io>
-about: Diognastic lab for substrate staking.
+author: Parity Technologies <admin@parity.io>
+about: Diagnostic lab for everything election and phragmen related in a substrate chain.
 args:
     - uri:
         short: u
@@ -50,8 +50,13 @@ subcommands:
                 takes_value: true
             - check-exposures:
                 long: check-exposures
-                help: check on-chain exposures at the given era with support values computed locally. This will most often only work at block number right after an election. The era must be provided. if you put 0, then it will resolve to `Staking::current_era()`.
+                help: (EXPERIMENTAL) check on-chain exposures at the given era with support values computed locally. This will most often only work at block number right after an election. The era must be provided. if you put 0, then it will resolve to `Staking::current_era()`.
                 takes_value: true
+            - reduce:
+                short: r
+                long: reduce
+                help: should run reduce on the result or not.
+                takes_value: false
     - council:
         about: Runs the phragmen election for the elections-phragmen module (usually used for council).
         args:
@@ -75,3 +80,5 @@ subcommands:
                 long: iterations
                 help: number of post-processing iterations to run. Default is 0
                 takes_value: true
+    - playground:
+        about: Runs any program that you put in src/subcommands/playground.rs. No parameters are accepted.

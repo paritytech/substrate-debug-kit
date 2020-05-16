@@ -160,6 +160,9 @@ fn main() {
 			("council", Some(sub_m)) => {
 				subcommands::elections_phragmen::run(&client, common_config.clone(), sub_m).await
 			}
+			("playground", Some(_)) => {
+				subcommands::playground::run(&client, common_config.clone()).await
+			}
 			_ => panic!("no sub-command provided"),
 		};
 

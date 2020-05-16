@@ -13,7 +13,7 @@ use sp_runtime::traits::Convert;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 
-const MODULE: &'static str = "Staking";
+const MODULE: &[u8] = b"Staking";
 
 /// A staker
 #[derive(Debug, Clone, Default)]
@@ -22,6 +22,7 @@ struct Staker {
 	stake: Balance,
 }
 
+#[allow(dead_code)]
 pub fn empty_ext_with_runtime<T: frame_system::Trait>() -> sp_io::TestExternalities {
 	frame_system::GenesisConfig::default()
 		.build_storage::<T>()
@@ -29,40 +30,32 @@ pub fn empty_ext_with_runtime<T: frame_system::Trait>() -> sp_io::TestExternalit
 		.into()
 }
 
+fn assert_supports_total_equal(s1: &SupportMap<AccountId>, s2: &SupportMap<AccountId>) {
+	assert!(s1.iter().all(|(v, s)| s2.get(v).unwrap().total == s.total))
+}
+
 async fn get_current_era(client: &Client, at: Hash) -> EraIndex {
-	storage::read::<EraIndex>(
-		storage::value_key("Staking".to_string(), "CurrentEra".to_string()),
-		client,
-		at,
-	)
-	.await
-	.expect("CurrentEra must exist")
+	storage::read::<EraIndex>(storage::value_key(MODULE, b"CurrentEra"), client, at)
+		.await
+		.expect("CurrentEra must exist")
 }
 
 async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
-	storage::enumerate_map::<AccountId, ValidatorPrefs>(
-		MODULE.to_string(),
-		"Validators".to_string(),
-		client,
-		at,
-	)
-	.await
-	.expect("Staking::validators should be enumerable.")
-	.into_iter()
-	.map(|(v, _p)| v)
-	.collect::<Vec<AccountId>>()
+	storage::enumerate_map::<AccountId, ValidatorPrefs>(MODULE, b"Validators", client, at)
+		.await
+		.expect("Staking::validators should be enumerable.")
+		.into_iter()
+		.map(|(v, _p)| v)
+		.collect::<Vec<AccountId>>()
 }
 
 async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>)> {
-	let nominators: Vec<(AccountId, Nominations<AccountId>)> =
-		storage::enumerate_map::<AccountId, Nominations<AccountId>>(
-			MODULE.to_string(),
-			"Nominators".to_string(),
-			client,
-			at,
-		)
-		.await
-		.expect("Staking::nominators should be enumerable");
+	let nominators: Vec<(AccountId, Nominations<AccountId>)> = storage::enumerate_map::<
+		AccountId,
+		Nominations<AccountId>,
+	>(MODULE, b"Nominators", client, at)
+	.await
+	.expect("Staking::nominators should be enumerable");
 
 	nominators
 		.into_iter()
@@ -80,7 +73,7 @@ async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>
 					.map_or(true, |spans| submitted_in >= spans.last_nonzero_slash())
 			});
 			log::trace!(
-				target: "staking",
+				target: LOG_TARGET,
 				"[{}] retaining {}/{} nominations for {:?}",
 				idx,
 				targets.len(),
@@ -95,11 +88,7 @@ async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>
 
 async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> Staker {
 	let ctrl = storage::read::<AccountId>(
-		storage::map_key::<frame_support::Twox64Concat>(
-			MODULE.to_string(),
-			"Bonded".to_string(),
-			stash.as_ref(),
-		),
+		storage::map_key::<frame_support::Twox64Concat>(MODULE, b"Bonded", stash.as_ref()),
 		&client,
 		at,
 	)
@@ -107,11 +96,7 @@ async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> 
 	.expect("All stashes must have 'Bonded' storage.");
 
 	let ledger = storage::read::<StakingLedger<AccountId, Balance>>(
-		storage::map_key::<frame_support::Blake2_128Concat>(
-			MODULE.to_string(),
-			"Ledger".to_string(),
-			ctrl.as_ref(),
-		),
+		storage::map_key::<frame_support::Blake2_128Concat>(MODULE, b"Ledger", ctrl.as_ref()),
 		&client,
 		at,
 	)
@@ -126,11 +111,7 @@ async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> 
 
 async fn slashing_span_of(stash: &AccountId, client: &Client, at: Hash) -> Option<SlashingSpans> {
 	storage::read::<SlashingSpans>(
-		storage::map_key::<frame_support::Twox64Concat>(
-			MODULE.to_string(),
-			"SlashingSpans".to_string(),
-			stash.as_ref(),
-		),
+		storage::map_key::<frame_support::Twox64Concat>(MODULE, b"SlashingSpans", stash.as_ref()),
 		&client,
 		at,
 	)
@@ -145,8 +126,8 @@ async fn exposure_of(
 ) -> Exposure<AccountId, Balance> {
 	storage::read::<Exposure<AccountId, Balance>>(
 		storage::double_map_key::<frame_support::Twox64Concat, frame_support::Twox64Concat>(
-			MODULE.to_string(),
-			"ErasStakers".to_string(),
+			MODULE,
+			b"ErasStakers",
 			era.encode().as_ref(),
 			stash.as_ref(),
 		),
@@ -158,27 +139,18 @@ async fn exposure_of(
 }
 
 async fn get_validator_count(client: &Client, at: Hash) -> u32 {
-	storage::read::<u32>(
-		storage::value_key(MODULE.to_string(), "ValidatorCount".to_string()),
-		client,
-		at,
-	)
-	.await
-	.unwrap_or(50)
+	storage::read::<u32>(storage::value_key(MODULE, b"ValidatorCount"), client, at)
+		.await
+		.unwrap_or(50)
 }
 
 async fn create_snapshot_nominators(client: &Client, at: Hash) -> Vec<AccountId> {
-	storage::enumerate_map::<AccountId, Nominations<AccountId>>(
-		MODULE.to_string(),
-		"Nominators".to_string(),
-		client,
-		at,
-	)
-	.await
-	.unwrap()
-	.iter()
-	.map(|(who, _)| who.clone())
-	.collect()
+	storage::enumerate_map::<AccountId, Nominations<AccountId>>(MODULE, b"Nominators", client, at)
+		.await
+		.unwrap()
+		.iter()
+		.map(|(who, _)| who.clone())
+		.collect()
 }
 
 async fn prepare_offchain_submission(
@@ -282,6 +254,7 @@ async fn prepare_offchain_submission(
 #[derive(Clone, Default)]
 struct CommandConfig {
 	pub iterations: usize,
+	pub reduce: bool,
 	pub count: usize,
 	pub min_count: usize,
 	pub output: Option<String>,
@@ -296,6 +269,8 @@ impl From<&clap::ArgMatches<'_>> for CommandConfig {
 			.unwrap_or("0")
 			.parse()
 			.unwrap();
+
+		let reduce: bool = matches.is_present("reduce");
 
 		let output = matches.value_of("output").map(|o| o.to_string());
 
@@ -316,6 +291,7 @@ impl From<&clap::ArgMatches<'_>> for CommandConfig {
 
 		Self {
 			iterations,
+			reduce,
 			count,
 			min_count,
 			output,
@@ -328,6 +304,7 @@ impl From<&clap::ArgMatches<'_>> for CommandConfig {
 pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::ArgMatches<'_>) {
 	let mut command_config = CommandConfig::from(matches);
 	let iterations = command_config.iterations;
+	let reduce = command_config.reduce;
 	let at = common_config.at;
 	let verbosity = common_config.verbosity;
 
@@ -407,12 +384,24 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 		t_stop!(equalize_post_processing);
 		let improved_score = evaluate_support(&supports);
 		log::info!(
+			target: LOG_TARGET,
 			"Equalized the results for [{}/{}] iterations, improved slot stake by {:?}",
 			done,
 			iterations,
 			KSM(improved_score[0] - initial_score[0]),
 		);
 		initial_score = improved_score;
+	}
+
+	if reduce {
+		t_start!(reducing_solution);
+		sp_phragmen::reduce(&mut staked_assignments);
+		t_stop!(reducing_solution);
+		// just to check that support has NOT changed
+		let (support_after_reduce, _) =
+			build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice());
+		assert_supports_total_equal(&support_after_reduce, &supports);
+		supports = support_after_reduce;
 	}
 
 	let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();

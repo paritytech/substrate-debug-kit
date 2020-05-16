@@ -1,8 +1,9 @@
 use crate::primitives::{AccountId, Balance, Hash};
 use crate::{storage, Client};
 use codec::Decode;
-use jsonrpsee::common::Params;
+use jsonrpsee::common::{to_value as to_json_value, Params};
 use lazy_static::lazy_static;
+use pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
 use sp_core::storage::StorageData;
 use sp_runtime::traits::Convert;
 use std::sync::Mutex;
@@ -54,11 +55,7 @@ impl Convert<u128, u128> for CurrencyToVoteHandler {
 #[allow(dead_code)]
 pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
 	let nick = storage::read::<(Vec<u8>, Balance)>(
-		storage::map_key::<frame_support::Twox64Concat>(
-			"Nicks".to_string(),
-			"NameOf".to_string(),
-			who.as_ref(),
-		),
+		storage::map_key::<frame_support::Twox64Concat>(b"Nicks", b"NameOf", who.as_ref()),
 		client,
 		at,
 	)
@@ -74,11 +71,7 @@ pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
 pub async fn get_identity(who: &AccountId, client: &Client, at: Hash) -> String {
 	use pallet_identity::{Data, Registration};
 	let maybe_identity = storage::read::<Registration<Balance>>(
-		storage::map_key::<frame_support::Twox64Concat>(
-			"Identity".to_string(),
-			"IdentityOf".to_string(),
-			who.as_ref(),
-		),
+		storage::map_key::<frame_support::Twox64Concat>(b"Identity", b"IdentityOf", who.as_ref()),
 		client,
 		at,
 	)
@@ -102,15 +95,42 @@ pub async fn get_head(client: &Client) -> Hash {
 	let data: Option<StorageData> = client
 		.request("chain_getFinalizedHead", Params::None)
 		.await
-		.expect("Storage request failed");
+		.expect("get chain finalized head request failed");
 	let now_raw = data.expect("Should always get the head hash").0;
 	<Hash as Decode>::decode(&mut &*now_raw).expect("Block hash should decode")
+}
+
+/// Get the block at a particular hash
+pub async fn get_block(client: &Client, at: Hash) -> kusama_runtime::SignedBlock {
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let data: Option<kusama_runtime::SignedBlock> = client
+		.request("chain_getBlock", Params::Array(vec![at]))
+		.await
+		.unwrap();
+
+	data.unwrap()
+}
+
+/// Get the extrinsic info
+pub async fn get_xt_info(
+	client: &Client,
+	extrinsic: sp_core::Bytes,
+	at: Hash,
+) -> RuntimeDispatchInfo<Balance> {
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let extrinsic = to_json_value(extrinsic).expect("extrinsic serialization infallible");
+	let data: Option<RuntimeDispatchInfo<Balance>> = client
+		.request("payment_queryInfo", Params::Array(vec![extrinsic, at]))
+		.await
+		.unwrap();
+
+	data.unwrap()
 }
 
 /// Get total issuance of the chain.
 async fn get_total_issuance(client: &Client, at: Hash) -> Balance {
 	let maybe_total_issuance = storage::read::<Balance>(
-		storage::value_key("Balances".to_string(), "TotalIssuance".to_string()),
+		storage::value_key(b"Balances", b"TotalIssuance"),
 		&client,
 		at,
 	)

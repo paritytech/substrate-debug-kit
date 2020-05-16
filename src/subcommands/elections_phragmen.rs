@@ -4,11 +4,11 @@ use sp_phragmen::*;
 use sp_runtime::traits::Convert;
 use std::collections::BTreeMap;
 
-const MODULE: &'static str = "PhragmenElection";
+const MODULE: &[u8] = b"PhragmenElection";
 
 async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 	let mut members = storage::read::<Vec<(AccountId, Balance)>>(
-		storage::value_key(MODULE.to_string(), "Members".to_string()),
+		storage::value_key(MODULE, b"Members"),
 		client,
 		at,
 	)
@@ -19,7 +19,7 @@ async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 	.collect::<Vec<AccountId>>();
 
 	let runners = storage::read::<Vec<(AccountId, Balance)>>(
-		storage::value_key(MODULE.to_string(), "RunnersUp".to_string()),
+		storage::value_key(MODULE, b"RunnersUp"),
 		client,
 		at,
 	)
@@ -29,13 +29,10 @@ async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 	.map(|(m, _)| m)
 	.collect::<Vec<AccountId>>();
 
-	let candidates = storage::read::<Vec<AccountId>>(
-		storage::value_key(MODULE.to_string(), "Candidates".to_string()),
-		client,
-		at,
-	)
-	.await
-	.unwrap_or_default();
+	let candidates =
+		storage::read::<Vec<AccountId>>(storage::value_key(MODULE, b"Candidates"), client, at)
+			.await
+			.unwrap_or_default();
 
 	log::trace!(
 		target: LOG_TARGET,
@@ -55,17 +52,12 @@ async fn get_voters_and_budget(
 	client: &Client,
 	at: Hash,
 ) -> Vec<(AccountId, Balance, Vec<AccountId>)> {
-	storage::enumerate_map::<AccountId, (Balance, Vec<AccountId>)>(
-		MODULE.to_string(),
-		"Voting".to_string(),
-		client,
-		at,
-	)
-	.await
-	.unwrap()
-	.into_iter()
-	.map(|(n, (b, t))| (n, b, t))
-	.collect::<Vec<_>>()
+	storage::enumerate_map::<AccountId, (Balance, Vec<AccountId>)>(MODULE, b"Voting", client, at)
+		.await
+		.unwrap()
+		.into_iter()
+		.map(|(n, (b, t))| (n, b, t))
+		.collect::<Vec<_>>()
 }
 
 struct CommandConfig {

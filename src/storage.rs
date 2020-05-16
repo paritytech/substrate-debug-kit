@@ -13,19 +13,15 @@ use std::fmt::Debug;
 type StorageKeyPair = Vec<(StorageKey, StorageData)>;
 
 /// create key for a simple value.
-pub fn value_key(module: String, storage: String) -> StorageKey {
+pub fn value_key(module: &[u8], storage: &[u8]) -> StorageKey {
 	let mut final_key = [0u8; 32];
-	final_key[0..16].copy_from_slice(&twox_128(module.as_bytes()));
-	final_key[16..32].copy_from_slice(&twox_128(storage.as_bytes()));
+	final_key[0..16].copy_from_slice(&twox_128(module));
+	final_key[16..32].copy_from_slice(&twox_128(storage));
 	StorageKey(final_key.to_vec())
 }
 
 /// create key for a map.
-pub fn map_key<H: StorageHasher>(
-	module: String,
-	storage: String,
-	encoded_key: &[u8],
-) -> StorageKey {
+pub fn map_key<H: StorageHasher>(module: &[u8], storage: &[u8], encoded_key: &[u8]) -> StorageKey {
 	let prefix = map_prefix_raw(module, storage);
 	let key = H::hash(encoded_key);
 	let mut final_key = Vec::with_capacity(prefix.len() + key.as_ref().len());
@@ -36,8 +32,8 @@ pub fn map_key<H: StorageHasher>(
 
 /// create key for a double map.
 pub fn double_map_key<H1: StorageHasher, H2: StorageHasher>(
-	module: String,
-	storage: String,
+	module: &[u8],
+	storage: &[u8],
 	encoded_key_1: &[u8],
 	encoded_key_2: &[u8],
 ) -> StorageKey {
@@ -53,14 +49,14 @@ pub fn double_map_key<H1: StorageHasher, H2: StorageHasher>(
 }
 
 /// create key prefix for a map
-pub fn map_prefix_key(module: String, storage: String) -> StorageKey {
+pub fn map_prefix_key(module: &[u8], storage: &[u8]) -> StorageKey {
 	StorageKey(map_prefix_raw(module, storage))
 }
 
 /// create key prefix for a map as a raw byte vec.
-pub fn map_prefix_raw(module: String, storage: String) -> Vec<u8> {
-	let module_key = twox_128(module.as_bytes());
-	let storage_key = twox_128(storage.as_bytes());
+pub fn map_prefix_raw(module: &[u8], storage: &[u8]) -> Vec<u8> {
+	let module_key = twox_128(module);
+	let storage_key = twox_128(storage);
 	let mut final_key = Vec::with_capacity(module_key.len() + storage_key.len());
 	final_key.extend_from_slice(&module_key);
 	final_key.extend_from_slice(&storage_key);
@@ -82,8 +78,8 @@ pub async fn read<T: Decode>(key: StorageKey, client: &Client, at: Hash) -> Opti
 
 /// Enumerate all keys and values in a storage map.
 pub async fn enumerate_map<K, V>(
-	module: String,
-	storage: String,
+	module: &[u8],
+	storage: &[u8],
 	client: &Client,
 	at: Hash,
 ) -> Result<Vec<(K, V)>, &'static str>
