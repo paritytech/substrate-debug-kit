@@ -19,34 +19,20 @@ serde_json = { version = "1.0" }
 clap = { version = "2.33.0", features = ["yaml"] }
 lazy_static = "1.4.0"
 
-# Needed anyhow
-node-primitives = { git = "https://github.com/paritytech/substrate", branch = "master" }
-# node-runtime = { git = "https://github.com/paritytech/substrate", branch = "master" }
+# Dynamic stuff.. technically we should get these from the metadata..
+# node-primitives = { git = "https://github.com/paritytech/substrate", branch = "master" }
+node-primitives = { package = "polkadot-primitives", git = "https://github.com/paritytech/polkadot", branch = "master" }
 kusama-runtime = { git = "https://github.com/paritytech/polkadot/", branch = "master" }
 
-# Remote crates
-sc-rpc-api = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-core = { git = "https://github.com/paritytech/substrate", branch = "master", features = ["std", "full_crypto"] }
-sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-phragmen = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-io = { git = "https://github.com/paritytech/substrate", branch = "master" }
-frame-support = { git = "https://github.com/paritytech/substrate", branch = "master" }
-frame-system = { git = "https://github.com/paritytech/substrate", branch = "master" }
-pallet-staking = { git = "https://github.com/paritytech/substrate", branch = "master" }
-pallet-identity = { git = "https://github.com/paritytech/substrate", branch = "master" }
-pallet-indices = { git = "https://github.com/paritytech/substrate", branch = "master" }
-pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "master" }
-pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/substrate", branch = "master" }
-
-# For local debug
-# sc-rpc-api = { path = "./../substrate/client/rpc-api" }
-# sp-core = { path = "./../substrate/primitives/core" }
-# sp-runtime = { path = "./../substrate/primitives/runtime" }
-# sp-phragmen = { path = "./../substrate/primitives/phragmen" }
-# sp-io = { path = "./../substrate/primitives/io" }
-# frame-support = { path = "./../substrate/frame/support" }
-# frame-system = { path = "./../substrate/frame/system" }
-# pallet-staking = { path = "./../substrate/frame/staking" }
-# pallet-identity = { path = "./../substrate/frame/identity" }
-# pallet-indices = { path = "./../substrate/frame/indices" }
-# node-runtime = { path = "./../substrate/bin/node/runtime" }
+sc-rpc-api = "0.8.0-alpha.8"
+sp-core = { version = "2.0.0-alpha.8", features = ["std", "full_crypto"] }
+sp-runtime = "2.0.0-alpha.8"
+sp-phragmen = "2.0.0-alpha.8"
+sp-io = "2.0.0-alpha.8"
+frame-support = "2.0.0-alpha.8"
+frame-system = "2.0.0-alpha.8"
+pallet-staking = "2.0.0-alpha.8"
+pallet-identity = "2.0.0-alpha.8"
+pallet-indices = "2.0.0-alpha.8"
+pallet-balances = "2.0.0-alpha.8"
+pallet-transaction-payment-rpc-runtime-api = "2.0.0-alpha.8"
