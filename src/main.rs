@@ -150,6 +150,18 @@ fn main() {
 		};
 		common_config.at = at;
 
+		// consolidate runtime version
+		let chain_version = network::get_runtime_version(&client, at).await;
+		let imported_version = kusama_runtime::VERSION;
+
+		if chain_version.spec_version != imported_version.spec_version {
+			log::error!(
+				"Different runtime versions at latest head! \nCode is using {:?}\nChain is using {:?}",
+				imported_version,
+				chain_version,
+			);
+		}
+
 		// set total issuance
 		network::issuance::set(&client, at).await;
 

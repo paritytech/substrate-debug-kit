@@ -106,7 +106,18 @@ pub async fn get_block(client: &Client, at: Hash) -> kusama_runtime::SignedBlock
 	let data: Option<kusama_runtime::SignedBlock> = client
 		.request("chain_getBlock", Params::Array(vec![at]))
 		.await
-		.unwrap();
+		.expect("Failed to decode block");
+
+	data.unwrap()
+}
+
+/// Get the runtime version at the given block.
+pub async fn get_runtime_version(client: &Client, at: Hash) -> sp_version::RuntimeVersion {
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let data: Option<sp_version::RuntimeVersion> = client
+		.request("state_getRuntimeVersion", Params::Array(vec![at]))
+		.await
+		.expect("Failed to decode block");
 
 	data.unwrap()
 }

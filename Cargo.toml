@@ -21,18 +21,20 @@ lazy_static = "1.4.0"
 
 # Dynamic stuff.. technically we should get these from the metadata..
 # node-primitives = { git = "https://github.com/paritytech/substrate", branch = "master" }
-node-primitives = { package = "polkadot-primitives", git = "https://github.com/paritytech/polkadot", branch = "master" }
-kusama-runtime = { git = "https://github.com/paritytech/polkadot/", branch = "master" }
+node-primitives = { package = "polkadot-primitives", git = "https://github.com/paritytech/polkadot", branch = "offchain-phragmen-v0.7.33" }
+kusama-runtime = { git = "https://github.com/paritytech/polkadot/", branch = "offchain-phragmen-v0.7.33" }
 
-sc-rpc-api = "0.8.0-alpha.8"
-sp-core = { version = "2.0.0-alpha.8", features = ["std", "full_crypto"] }
-sp-runtime = "2.0.0-alpha.8"
-sp-phragmen = "2.0.0-alpha.8"
-sp-io = "2.0.0-alpha.8"
-frame-support = "2.0.0-alpha.8"
-frame-system = "2.0.0-alpha.8"
-pallet-staking = "2.0.0-alpha.8"
-pallet-identity = "2.0.0-alpha.8"
-pallet-indices = "2.0.0-alpha.8"
-pallet-balances = "2.0.0-alpha.8"
-pallet-transaction-payment-rpc-runtime-api = "2.0.0-alpha.8"
+# This commit rev must come from the lock file of the associated version of kusama runtime above.
+sc-rpc-api = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+sp-core = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb", features = ["std", "full_crypto"] }
+sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+sp-phragmen = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+sp-version = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+sp-io = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+frame-support = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+frame-system = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+pallet-staking = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+pallet-identity = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+pallet-indices = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+pallet-balances = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
+pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/substrate", rev = "e7457b1eb" }
