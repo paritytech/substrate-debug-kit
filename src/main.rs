@@ -30,10 +30,10 @@ pub use sc_rpc_api::state::StateClient;
 use separator::Separatable;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 use std::{convert::TryInto, fmt};
+use sub_storage as storage;
 
 mod network;
 mod primitives;
-mod storage;
 #[macro_use]
 mod timing;
 mod subcommands;
@@ -53,13 +53,18 @@ impl Get<Balance> for KSM {
 	}
 }
 
+/// Genesis hash of Kusama network.
+pub const KUSAMA_GENESIS: [u8; 32] =
+	hex_literal::hex!["cd9b8e2fc2f57c4570a86319b005832080e0c478ab41ae5d44e23705872f5ad3"];
+
 impl fmt::Debug for KSM {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let num: u128 = self.0.try_into().unwrap();
 		write!(
 			f,
-			"{}_KSM ({})",
+			"{},{:0>3}KSM ({})",
 			self.0 / <Self as Get<Balance>>::get(),
+			self.0 % <Self as Get<Balance>>::get() / (<Self as Get<Balance>>::get() / 1000),
 			num.separated_string()
 		)
 	}
@@ -120,7 +125,8 @@ impl From<&clap::ArgMatches<'_>> for CommonConfig {
 	}
 }
 
-fn main() {
+#[async_std::main]
+async fn main() -> () {
 	env_logger::try_init().ok();
 
 	let yaml = load_yaml!("../cli.yml");
@@ -131,47 +137,56 @@ fn main() {
 
 	// setup address format
 	set_default_ss58_version(common_config.address_format);
+	// connect to a node.
+	let transport = jsonrpsee::transport::ws::WsTransportClient::new(&common_config.uri)
+		.await
+		.expect("Failed to connect to client");
+	let client: Client = jsonrpsee::raw::RawClient::new(transport).into();
 
-	async_std::task::block_on(async {
-		// connect to a node.
-		let transport = jsonrpsee::transport::ws::WsTransportClient::new(&common_config.uri)
-			.await
-			.expect("Failed to connect to client");
-		let client: Client = jsonrpsee::raw::RawClient::new(transport).into();
+	// get the latest block hash
+	let head = network::get_head(&client).await;
 
-		// get the latest block hash
-		let head = network::get_head(&client).await;
+	// potentially replace with the given hash
+	let at: Hash = if let Some(at_str) = common_config.at_raw.clone() {
+		Hash::from_slice(&hex::decode(at_str).expect("invalid hash format given"))
+	} else {
+		head
+	};
+	common_config.at = at;
 
-		// potentially replace with the given hash
-		let at: Hash = if let Some(at_str) = common_config.at_raw.clone() {
-			Hash::from_slice(&hex::decode(at_str).expect("invalid hash format given"))
-		} else {
-			head
-		};
-		common_config.at = at;
+	// consolidate runtime version
+	let chain_version = network::get_runtime_version(&client, at).await;
+	let imported_version = node_runtime::VERSION;
 
-		// set total issuance
-		network::issuance::set(&client, at).await;
-
-		match matches.subcommand() {
-			("staking", Some(sub_m)) => {
-				subcommands::staking::run(&client, common_config.clone(), sub_m).await
-			}
-			("council", Some(sub_m)) => {
-				subcommands::elections_phragmen::run(&client, common_config.clone(), sub_m).await
-			}
-			("playground", Some(_)) => {
-				subcommands::playground::run(&client, common_config.clone()).await
-			}
-			_ => panic!("no sub-command provided"),
-		};
-
-		log::info!(
-			target: LOG_TARGET,
-			"total_issuance = {:?}",
-			KSM(network::issuance::get())
+	if chain_version.spec_version != imported_version.spec_version {
+		log::error!(
+			"Different runtime versions at latest head! \nCode is using {:?}\nChain is using {:?}",
+			imported_version,
+			chain_version,
 		);
-		log::info!(target: LOG_TARGET, "connected to [{}]", common_config.uri);
-		log::info!(target: LOG_TARGET, "at [{}]", at);
-	})
+	}
+
+	// set total issuance
+	network::issuance::set(&client, at).await;
+
+	log::info!(
+		target: LOG_TARGET,
+		"total_issuance = {:?}",
+		KSM(network::issuance::get())
+	);
+	log::info!(target: LOG_TARGET, "connected to [{}]", common_config.uri);
+	log::info!(target: LOG_TARGET, "at [{}]", at);
+
+	match matches.subcommand() {
+		("staking", Some(sub_m)) => {
+			subcommands::staking::run(&client, common_config.clone(), sub_m).await
+		}
+		("council", Some(sub_m)) => {
+			subcommands::elections_phragmen::run(&client, common_config.clone(), sub_m).await
+		}
+		("playground", Some(_)) => {
+			subcommands::playground::run(&client, common_config.clone()).await
+		}
+		_ => panic!("no sub-command provided"),
+	};
 }

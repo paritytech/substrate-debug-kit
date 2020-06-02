@@ -1,1 +1,5 @@
 hard_tabs = true
+max_width = 100
+merge_imports = true
+reorder_impl_items = true
+trailing_comma = "Vertical"
