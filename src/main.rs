@@ -140,7 +140,6 @@ async fn main() -> () {
 		.eq(&Ss58AddressFormat::PolkadotAccount)
 	{
 		*TOKEN_NAME.borrow_mut() = "DOT";
-		*DECIMAL_POINTS.borrow_mut() = 1_000_000_000_000_000;
 	}
 
 	// connect to a node.
