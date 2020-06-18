@@ -23,8 +23,8 @@
 // whatever node you are connecting to. Polkadot, substrate etc.
 pub use primitives::{AccountId, Balance, BlockNumber, Hash};
 
+use atomic_refcell::AtomicRefCell as RefCell;
 use clap::{load_yaml, App};
-use frame_support::traits::Get;
 use jsonrpsee::Client;
 pub use sc_rpc_api::state::StateClient;
 use separator::Separatable;
@@ -36,41 +36,39 @@ mod network;
 mod primitives;
 #[macro_use]
 mod timing;
-mod subcommands;
+/// Sub commands.
+pub mod subcommands;
 
 /// Default logging target.
 pub const LOG_TARGET: &'static str = "offline-phragmen";
 
-/// Wrapper to pretty-print ksm (or any other 12 decimal) token.
-///
-/// It stores the decimal points of token type as a `Get<Balance>` implementation.
-struct KSM(Balance);
+/// Decimal points of the currency based on the network.
+pub static DECIMAL_POINTS: RefCell<Balance> = RefCell::new(1_000_000_000_000);
+/// Name of the currency token based on the network.
+pub static TOKEN_NAME: RefCell<&'static str> = RefCell::new("KSM");
 
-impl Get<Balance> for KSM {
-	// return the decimal points
-	fn get() -> Balance {
-		1_000_000_000_000 as Balance
-	}
-}
+/// Wrapper to pretty-print currency token.
+struct Currency(Balance);
 
 /// Genesis hash of Kusama network.
 pub const KUSAMA_GENESIS: [u8; 32] =
 	hex_literal::hex!["cd9b8e2fc2f57c4570a86319b005832080e0c478ab41ae5d44e23705872f5ad3"];
 
-impl fmt::Debug for KSM {
+impl fmt::Debug for Currency {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let num: u128 = self.0.try_into().unwrap();
 		write!(
 			f,
-			"{},{:0>3}KSM ({})",
-			self.0 / <Self as Get<Balance>>::get(),
-			self.0 % <Self as Get<Balance>>::get() / (<Self as Get<Balance>>::get() / 1000),
+			"{},{:0>3}{} ({})",
+			self.0 / *DECIMAL_POINTS.borrow(),
+			self.0 % *DECIMAL_POINTS.borrow() / (*DECIMAL_POINTS.borrow() / 1000),
+			*TOKEN_NAME.borrow(),
 			num.separated_string()
 		)
 	}
 }
 
-impl fmt::Display for KSM {
+impl fmt::Display for Currency {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let num: u128 = self.0.try_into().unwrap();
 		write!(f, "{}", num.separated_string())
@@ -135,8 +133,15 @@ async fn main() -> () {
 
 	let mut common_config = CommonConfig::from(&matches);
 
-	// setup address format
+	// setup address format and currency based on address format.
 	set_default_ss58_version(common_config.address_format);
+	if common_config
+		.address_format
+		.eq(&Ss58AddressFormat::PolkadotAccount)
+	{
+		*TOKEN_NAME.borrow_mut() = "DOT";
+	}
+
 	// connect to a node.
 	let transport = jsonrpsee::transport::ws::WsTransportClient::new(&common_config.uri)
 		.await
@@ -159,8 +164,10 @@ async fn main() -> () {
 	let imported_version = node_runtime::VERSION;
 
 	if chain_version.spec_version != imported_version.spec_version {
-		log::error!(
-			"Different runtime versions at latest head! \nCode is using {:?}\nChain is using {:?}",
+		log::warn!(
+			target: LOG_TARGET,
+			"Different runtime versions at latest head! \n## Code is using {:?}\n## Chain is using {:?}.
+This is not necessarily bad. Your code might work well if the block types are the same. Report an issue if you see an error.",
 			imported_version,
 			chain_version,
 		);
@@ -172,7 +179,7 @@ async fn main() -> () {
 	log::info!(
 		target: LOG_TARGET,
 		"total_issuance = {:?}",
-		KSM(network::issuance::get())
+		Currency(network::issuance::get())
 	);
 	log::info!(target: LOG_TARGET, "connected to [{}]", common_config.uri);
 	log::info!(target: LOG_TARGET, "at [{}]", at);
@@ -183,6 +190,9 @@ async fn main() -> () {
 		}
 		("council", Some(sub_m)) => {
 			subcommands::elections_phragmen::run(&client, common_config.clone(), sub_m).await
+		}
+		("dangling-nominators", Some(_)) => {
+			subcommands::dangling_nominators::run(&client, common_config.clone()).await
 		}
 		("playground", Some(_)) => {
 			subcommands::playground::run(&client, common_config.clone()).await

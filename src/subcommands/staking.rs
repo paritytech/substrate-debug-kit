@@ -3,12 +3,12 @@
 use crate::{
 	network,
 	primitives::{AccountId, Balance, Hash},
-	storage, Client, CommonConfig, KSM, LOG_TARGET,
+	storage, Client, CommonConfig, Currency, LOG_TARGET,
 };
 use codec::Encode;
 use pallet_staking::slashing::SlashingSpans;
 use pallet_staking::{EraIndex, Exposure, Nominations, StakingLedger, ValidatorPrefs};
-use sp_phragmen::*;
+use sp_npos_elections::*;
 use sp_runtime::traits::Convert;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
@@ -23,7 +23,7 @@ struct Staker {
 }
 
 #[allow(dead_code)]
-pub fn empty_ext_with_runtime<T: frame_system::Trait>() -> sp_io::TestExternalities {
+fn empty_ext_with_runtime<T: frame_system::Trait>() -> sp_io::TestExternalities {
 	frame_system::GenesisConfig::default()
 		.build_storage::<T>()
 		.unwrap()
@@ -109,7 +109,12 @@ async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> 
 	}
 }
 
-async fn slashing_span_of(stash: &AccountId, client: &Client, at: Hash) -> Option<SlashingSpans> {
+/// Get the slashing span of a voter stash.
+pub async fn slashing_span_of(
+	stash: &AccountId,
+	client: &Client,
+	at: Hash,
+) -> Option<SlashingSpans> {
 	storage::read::<SlashingSpans>(
 		storage::map_key::<frame_support::Twox64Concat>(MODULE, b"SlashingSpans", stash.as_ref()),
 		&client,
@@ -170,10 +175,10 @@ async fn prepare_offchain_submission(
 	};
 
 	t_start!(prepare_solution);
-	let PhragmenResult {
+	let ElectionResult {
 		winners,
 		assignments,
-	} = elect::<AccountId, pallet_staking::OffchainAccuracy>(
+	} = seq_phragmen::<AccountId, pallet_staking::OffchainAccuracy>(
 		count,
 		min_count,
 		candidates,
@@ -301,6 +306,7 @@ impl From<&clap::ArgMatches<'_>> for CommandConfig {
 	}
 }
 
+/// Main run function of the sub-command.
 pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::ArgMatches<'_>) {
 	let mut command_config = CommandConfig::from(matches);
 	let iterations = command_config.iterations;
@@ -344,10 +350,10 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 
 	// run phragmen
 	t_start!(phragmen_run);
-	let PhragmenResult {
+	let ElectionResult {
 		winners,
 		assignments,
-	} = elect::<AccountId, pallet_staking::ChainAccuracy>(
+	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
 		command_config.count,
 		command_config.min_count,
 		candidates.clone(),
@@ -380,7 +386,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 	if iterations > 0 {
 		// prepare and run post-processing.
 		t_start!(equalize_post_processing);
-		let done = equalize(&mut staked_assignments, &mut supports, 0, iterations);
+		let done = balance_solution(&mut staked_assignments, &mut supports, 0, iterations);
 		t_stop!(equalize_post_processing);
 		let improved_score = evaluate_support(&supports);
 		log::info!(
@@ -388,14 +394,14 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 			"Equalized the results for [{}/{}] iterations, improved slot stake by {:?}",
 			done,
 			iterations,
-			KSM(improved_score[0] - initial_score[0]),
+			Currency(improved_score[0] - initial_score[0]),
 		);
 		initial_score = improved_score;
 	}
 
 	if reduce {
 		t_start!(reducing_solution);
-		sp_phragmen::reduce(&mut staked_assignments);
+		sp_npos_elections::reduce(&mut staked_assignments);
 		t_stop!(reducing_solution);
 		// just to check that support has NOT changed
 		let (support_after_reduce, _) =
@@ -435,9 +441,9 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 			i + 1,
 			network::get_identity(&s, &client, at).await,
 			s,
-			KSM(support.total),
+			Currency(support.total),
 			other_count,
-			KSM(self_stake[0].1),
+			Currency(self_stake[0].1),
 		);
 
 		if verbosity >= 1 {
@@ -447,7 +453,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 					"    {}#{} [amount = {:?}] {:?}",
 					if *s == o.0 { "*" } else { "" },
 					i + 1,
-					KSM(o.1),
+					Currency(o.1),
 					o.0
 				);
 				nominator_info
@@ -468,9 +474,9 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 					expo.total,
 					support.total,
 					if support.total > expo.total {
-						format!("+{}", KSM(support.total - expo.total))
+						format!("+{}", Currency(support.total - expo.total))
 					} else {
-						format!("-{}", KSM(expo.total - support.total))
+						format!("-{}", Currency(expo.total - support.total))
 					}
 				);
 			}
@@ -490,16 +496,16 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 				"#{} {:?} // active_stake = {:?}",
 				counter,
 				nominator,
-				KSM(staker_info.stake),
+				Currency(staker_info.stake),
 			);
 			println!("  Distributions:");
 			info.iter().enumerate().for_each(|(i, (c, s))| {
 				sum += *s;
-				println!("    #{} {:?} => {:?}", i, c, KSM(*s));
+				println!("    #{} {:?} => {:?}", i, c, Currency(*s));
 			});
 			counter += 1;
 			let diff = sum.max(staker_info.stake) - sum.min(staker_info.stake);
-			// acceptable diff is one millionth of a KSM
+			// acceptable diff is one millionth of a Currency
 			assert!(
 				diff < 1_000,
 				"diff( sum_nominations,  staker_info.ledger.active) = {}",
@@ -573,7 +579,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 		"solution score {:?}",
 		initial_score
 			.iter()
-			.map(|n| format!("{:?}", KSM(*n)))
+			.map(|n| format!("{:?}", Currency(*n)))
 			.collect::<Vec<_>>(),
 	);
 	log::info!(

@@ -82,3 +82,5 @@ subcommands:
                 takes_value: true
     - playground:
         about: Runs any program that you put in src/subcommands/playground.rs. No parameters are accepted.
+    - dangling-nominators:
+        about: Get the dangling nominators in staking. Don't forget to turn on logging.

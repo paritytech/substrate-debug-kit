@@ -1,5 +1,15 @@
 # Offline Phragmen
 
+> Last update: Supports both polkadot and kusama using types from
+> [v0.8.8](https://github.com/paritytech/polkadot/releases/tag/v0.8.8).
+
+
+> Note that this software and repo is highly fragile and for now needs some manual work to be kept
+> up to date with new releases of the polkadot repo.
+
+---
+
+
 Simple script that scrapes the chain and runs the Phragmén election algorithm.
 
 The main aim of this project is to always work with the latest Kusama release, and later on
@@ -19,16 +29,23 @@ Top level parameters as follows. These can be fed to all scripts. For staking/co
 parameters, run the appropriate `--help` command to see the info (`cargo run -- staking --help`).
 
 ```
+offline-phragmen 1.0
+Parity Technologies <admin@parity.io>
+Diagnostic lab for everything election and phragmen related in a substrate chain.
+
+
 OPTIONS:
         --at <at>              scrape the data at the given block hash. Default will be the head of the chain
     -n, --network <network>    network address format. Can be kusama|polkadot|substrate. Default is kusama
     -u, --uri <URI>            websockets uri of the substrate node
 
 SUBCOMMANDS:
-    council       Runs the phragmen election for the elections-phragmen module (usually used for council).
-    help          Prints this message or the help of the given subcommand(s)
-    playground    Runs any program that you put in src/subcommands/playground.rs. No parameters are accepted.
-    staking       Runs the phragmen election for staking validators and nominators.
+    council                Runs the phragmen election for the elections-phragmen module (usually used for council).
+    dangling-nominators    Get the dangling nominators in staking. Don't forget to turn on logging.
+    help                   Prints this message or the help of the given subcommand(s)
+    playground             Runs any program that you put in src/subcommands/playground.rs. No parameters are
+                           accepted.
+    staking                Runs the phragmen election for staking validators and nominators.
 ```
 
 ## Example usage
