@@ -1,6 +1,7 @@
+#![allow(unused)]
+
 use crate::primitives::{Balance, Hash};
-use crate::KSM;
-use crate::{network, storage, Client, CommonConfig};
+use crate::{network, storage, Client, CommonConfig, Currency};
 use codec::Encode;
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
 use frame_support;
@@ -8,9 +9,9 @@ use hex_literal::hex;
 use network::get_account_data_at;
 use node_runtime::Call;
 use sp_core::{storage::StorageKey, Bytes};
-use sp_phragmen::PhragmenScore;
+use sp_npos_elections::ElectionScore;
 
-/// Run something.
+/// Main run function of the sub-command.
 pub async fn run(client: &Client, _command_config: CommonConfig) {
 	last_election_submission(client).await;
 	// account_balance_history(&k, crate::KUSAMA_GENESIS.into(), None, client).await;
@@ -19,7 +20,6 @@ pub async fn run(client: &Client, _command_config: CommonConfig) {
 }
 
 /// print the storage layout of chain.
-#[allow(unused)]
 async fn dust(client: &Client) {
 	fn unwrap_decoded<B: Eq + PartialEq + std::fmt::Debug, O: Eq + PartialEq + std::fmt::Debug>(
 		input: frame_metadata::DecodeDifferent<B, O>,
@@ -102,7 +102,6 @@ async fn dust(client: &Client) {
 	}
 }
 
-#[allow(unused)]
 /// Checks the account balance before and after the given block hash. Good for testing slash/reward.
 async fn account_balance_around_block(account: &[u8], at: Hash, client: &Client) {
 	let block = network::get_block(client, at).await.block;
@@ -117,19 +116,18 @@ async fn account_balance_around_block(account: &[u8], at: Hash, client: &Client)
 		println!(
 			"✅ Block {}: Increased by: {:?}",
 			block.header.number,
-			KSM(balance_after - balance_before)
+			Currency(balance_after - balance_before)
 		);
 	} else {
 		println!(
 			"❌ Block {}: Decreased by: {:?}",
 			block.header.number,
-			KSM(balance_before - balance_after)
+			Currency(balance_before - balance_after)
 		);
 	}
 }
 
 /// Scrape the account balance of an account from tip of the chain until `from`.
-#[allow(unused)]
 async fn account_balance_history(account: &[u8], until: Hash, from: Option<Hash>, client: &Client) {
 	use textplots::{Chart, Plot, Shape};
 	let mut now = from.unwrap_or_else(|| async_std::task::block_on(network::get_head(client)));
@@ -162,12 +160,7 @@ async fn account_balance_history(account: &[u8], until: Hash, from: Option<Hash>
 
 	let points = points
 		.into_iter()
-		.map(|(x, y)| {
-			(
-				x as f32,
-				y as f32 / <KSM as frame_support::traits::Get<Balance>>::get() as f32,
-			)
-		})
+		.map(|(x, y)| (x as f32, y as f32 / *crate::DECIMAL_POINTS.borrow() as f32))
 		.collect::<Vec<(f32, f32)>>();
 	dbg!(&points);
 	Chart::new(400, 180, 2411759.0, 2412091.0)
@@ -176,7 +169,6 @@ async fn account_balance_history(account: &[u8], until: Hash, from: Option<Hash>
 }
 
 /// Get the latest election submissions, and how they change the best score.
-#[allow(unused)]
 async fn last_election_submission(client: &Client) {
 	let submission_weight: u64 = 100000000000;
 
@@ -195,11 +187,11 @@ async fn last_election_submission(client: &Client) {
 
 	struct EraInfo {
 		message: String,
-		score: sp_phragmen::PhragmenScore,
+		score: ElectionScore,
 	}
 
 	impl EraInfo {
-		fn new(message: String, score: PhragmenScore) -> Self {
+		fn new(message: String, score: ElectionScore) -> Self {
 			Self { message, score }
 		}
 	}
@@ -209,7 +201,7 @@ async fn last_election_submission(client: &Client) {
 	let mut now = network::get_head(client).await;
 	let mut prev_era: pallet_staking::EraIndex = 0;
 
-	fn compare_scores(this: PhragmenScore, that: PhragmenScore) -> Vec<f64> {
+	fn compare_scores(this: ElectionScore, that: ElectionScore) -> Vec<f64> {
 		this.iter()
 			.map(|x| *x as i128)
 			.zip(that.iter().map(|x| *x as i128))
@@ -232,6 +224,7 @@ async fn last_election_submission(client: &Client) {
 						compact,
 						score,
 						era,
+						size,
 					) = staking_call
 					{
 						if era != prev_era && prev_era != 0 {
@@ -243,7 +236,11 @@ async fn last_election_submission(client: &Client) {
 								for EraInfo { message, score } in era_dumps.iter().rev() {
 									println!(
 										"[{} // {:?}]{}",
-										if sp_phragmen::is_score_better(prev_score, score.clone()) {
+										if sp_npos_elections::is_score_better(
+											score.clone(),
+											prev_score,
+											<node_runtime::Runtime as pallet_staking::Trait>::MinSolutionScoreBump::get(),
+										) {
 											"✅"
 										} else {
 											"❌"
@@ -266,17 +263,12 @@ async fn last_election_submission(client: &Client) {
 							.await
 							.expect("Must have some events");
 
-						let submission_event = events
-							.into_iter()
-							.map(|e| e.event)
-							.find_map(|event| {
-								if let node_runtime::Event::system(system_event) = event {
-									match system_event {
-										node_runtime::system::Event::<node_runtime::Runtime>::ExtrinsicSuccess(info) => {
-											if info.weight == submission_weight { Some("ExtrinsicSuccess".to_string()) } else { None }
-										}
-										node_runtime::system::Event::<node_runtime::Runtime>::ExtrinsicFailed(err, info) => {
-											if info.weight == submission_weight { Some(format!("ExtrinsicFailed({:?})", err)) } else { None }
+						let maybe_submission_event =
+							events.into_iter().map(|e| e.event).find_map(|event| {
+								if let node_runtime::Event::staking(staking_event) = event {
+									match staking_event {
+										node_runtime::staking::Event::<node_runtime::Runtime>::SolutionStored(compute) => {
+											Some("SolutionStored")
 										}
 										_ => None,
 									}
@@ -284,10 +276,9 @@ async fn last_election_submission(client: &Client) {
 									// nothing
 									None
 								}
-							})
-							.expect("Submission must either succeed or fail");
+							});
 
-						let info_event = format!("Event = {:?}", submission_event);
+						let info_event = format!("Event = {:?}", maybe_submission_event);
 						let message = format!("{} // {}", info_message, info_event);
 						era_dumps.push(EraInfo::new(message, score));
 
@@ -298,61 +289,6 @@ async fn last_election_submission(client: &Client) {
 			}
 		}
 
-		now = parent_hash;
-	}
-}
-
-#[allow(unused)]
-/// Coinbase fee prediction.
-async fn coinbase(client: &Client) {
-	let mut now = network::get_head(client).await;
-	loop {
-		let block = network::get_block(client, now).await.block;
-		let parent_hash = block.header.parent_hash;
-		let extrinsic_count = block.extrinsics.len();
-		for (index, e) in block.extrinsics.into_iter().enumerate() {
-			let call: Call = e.clone().function;
-			if let node_runtime::Call::Balances(balances_call) = call {
-				if let node_runtime::BalancesCall::transfer(dest, amount) = balances_call {
-					let info = network::query_info(Bytes(e.encode()), client, now).await;
-					let events = network::get_events_at(client, now).await.unwrap();
-					// filter the extrinsic events.
-					let extrinsic_events = events
-						.into_iter()
-						.map(|e| e.event)
-						.filter_map(|event| {
-							if let node_runtime::Event::system(system_event) = event {
-								match system_event {
-									node_runtime::system::Event::<node_runtime::Runtime>::ExtrinsicSuccess(..) |
-									node_runtime::system::Event::<node_runtime::Runtime>::ExtrinsicFailed(..) => {
-										Some(system_event)
-									}
-									_ => None,
-								}
-							} else {
-								// nothing
-								None
-							}
-						})
-						.collect::<Vec<node_runtime::system::Event<node_runtime::Runtime>>>();
-
-					assert_eq!(extrinsic_events.len(), extrinsic_count);
-					let transfer_event = extrinsic_events.get(index).unwrap();
-
-					let multiplier = storage::read::<sp_runtime::Fixed128>(
-						storage::value_key(b"TransactionPayment", b"NextFeeMultiplier"),
-						client,
-						now,
-					)
-					.await;
-					println!(
-						"Found a balances call here {:?} // {:?} // {:?} // {:?}",
-						&e, info, multiplier, transfer_event
-					);
-					break;
-				}
-			}
-		}
 		now = parent_hash;
 	}
 }

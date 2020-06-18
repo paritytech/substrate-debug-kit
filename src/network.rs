@@ -1,19 +1,16 @@
 use crate::primitives::{AccountId, Balance, Hash, Nonce};
 use crate::{storage, Client};
+use atomic_refcell::AtomicRefCell as RefCell;
 use codec::Decode;
 use frame_support::{Blake2_128Concat, Twox64Concat};
 use frame_system::AccountInfo;
 use jsonrpsee::common::{to_value as to_json_value, Params};
-use lazy_static::lazy_static;
 use pallet_balances::AccountData;
 use pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
 use sp_core::storage::{StorageData, StorageKey};
 use sp_runtime::traits::Convert;
-use std::sync::Mutex;
 
-lazy_static! {
-	static ref ISSUANCE: Mutex<Balance> = Mutex::new(0);
-}
+static ISSUANCE: RefCell<Balance> = RefCell::new(0);
 
 /// Deals with total issuance
 pub mod issuance {
@@ -22,14 +19,14 @@ pub mod issuance {
 
 	/// Get the previously set total issuance.
 	pub fn get() -> Balance {
-		ISSUANCE.lock().unwrap().clone()
+		ISSUANCE.borrow().clone()
 	}
 
 	/// Set the total issuance. Any code wanting to use `CurrencyToVoteHandler` must call this first
 	/// to set correct value in the global pointer.
 	pub async fn set(client: &Client, at: Hash) {
 		let total_issuance = get_total_issuance(client, at).await;
-		*ISSUANCE.lock().unwrap() = total_issuance;
+		*ISSUANCE.borrow_mut() = total_issuance;
 	}
 }
 

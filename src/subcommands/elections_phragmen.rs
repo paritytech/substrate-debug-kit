@@ -1,6 +1,6 @@
 use crate::primitives::{AccountId, Balance, Hash};
-use crate::{network, storage, Client, CommonConfig, KSM, LOG_TARGET};
-use sp_phragmen::*;
+use crate::{network, storage, Client, CommonConfig, Currency, LOG_TARGET};
+use sp_npos_elections::*;
 use sp_runtime::traits::Convert;
 use std::collections::BTreeMap;
 
@@ -94,6 +94,7 @@ impl From<&clap::ArgMatches<'_>> for CommandConfig {
 	}
 }
 
+/// Main run function of the sub-command.
 pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::ArgMatches<'_>) {
 	let command_config = CommandConfig::from(matches);
 	let at = common_config.at;
@@ -128,10 +129,10 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 
 	// run phragmen
 	t_start!(phragmen_run);
-	let PhragmenResult {
+	let ElectionResult {
 		winners,
 		assignments,
-	} = elect::<AccountId, pallet_staking::ChainAccuracy>(
+	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
 		command_config.count,
 		command_config.min_count,
 		candidates,
@@ -166,7 +167,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 			i + 1,
 			network::get_identity(&s.0, &client, at).await,
 			s.0,
-			KSM(supports.get(&s.0).unwrap().total),
+			Currency(supports.get(&s.0).unwrap().total),
 		);
 
 		if verbosity >= 1 {
@@ -177,7 +178,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 					"	{}#{} [amount = {:?}] {:?}",
 					if s.0 == o.0 { "*" } else { "" },
 					i,
-					KSM(o.1),
+					Currency(o.1),
 					o.0
 				);
 			});
