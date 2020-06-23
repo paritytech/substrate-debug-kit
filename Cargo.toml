@@ -21,27 +21,35 @@ clap = { version = "2.33.1", features = ["yaml"] }
 lazy_static = "1.4.0"
 textplots = "0.5.1"
 atomic_refcell = "0.1.6"
+ansi_term = "0.12.1"
 
 sub-storage = { path = "./sub-storage" }
 
 # Dynamic stuff.. technically we should get these from the metadata.. For now we use our branch in
 # lockstep with polkadot repo.
-node-primitives = { package = "polkadot-primitives", git = "https://github.com/paritytech/polkadot", branch = "offline-phragmen-v0.8.8" }
-node-runtime = { package = "kusama-runtime", git = "https://github.com/paritytech/polkadot/", branch = "offline-phragmen-v0.8.8" }
+node-primitives = { package = "polkadot-primitives", git = "https://github.com/paritytech/polkadot", branch = "offline-phragmen-v0.8.11" }
+kusama-runtime = { git = "https://github.com/paritytech/polkadot/", branch = "offline-phragmen-v0.8.11", optional = true }
+polkadot-runtime = { git = "https://github.com/paritytech/polkadot/", branch = "offline-phragmen-v0.8.11", optional = true }
+
 # node-runtime = { path = "../substrate/bin/node/runtime" }
 
 # This commit rev must come from the lock file of the associated version of kusama runtime above.
-sc-rpc-api = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-sp-io = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-sp-npos-elections = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-sp-version = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-frame-support = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-frame-system = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-frame-metadata = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-pallet-staking = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-pallet-identity = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-pallet-indices = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-pallet-balances = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
-pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/substrate", rev = "d735e4d0b5378c227f81a5127a1d4544de112fd8" }
+sc-rpc-api = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+sp-core = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+sp-io = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+sp-npos-elections = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+sp-version = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+frame-support = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+frame-system = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+frame-metadata = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+pallet-staking = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+pallet-identity = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+pallet-indices = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+pallet-balances = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+
+[features]
+default = ["polkadot"]
+polkadot = [ "polkadot-runtime" ]
+kusama = [ "kusama-runtime" ]

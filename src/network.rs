@@ -1,4 +1,4 @@
-use crate::primitives::{AccountId, Balance, Hash, Nonce};
+use crate::primitives::{runtime, AccountId, Balance, Hash, Nonce};
 use crate::{storage, Client};
 use atomic_refcell::AtomicRefCell as RefCell;
 use codec::Decode;
@@ -101,9 +101,9 @@ pub async fn get_head(client: &Client) -> Hash {
 }
 
 /// Get the block at a particular hash
-pub async fn get_block(client: &Client, at: Hash) -> node_runtime::SignedBlock {
+pub async fn get_block(client: &Client, at: Hash) -> runtime::SignedBlock {
 	let at = to_json_value(at).expect("Block hash serialization infallible");
-	let data: Option<node_runtime::SignedBlock> = client
+	let data: Option<runtime::SignedBlock> = client
 		.request("chain_getBlock", Params::Array(vec![at]))
 		.await
 		.expect("Failed to decode block");
@@ -160,7 +160,7 @@ pub async fn got_storage_size(key: StorageKey, client: &Client, at: Hash) -> Opt
 pub async fn get_events_at(
 	client: &Client,
 	at: Hash,
-) -> Option<Vec<frame_system::EventRecord<node_runtime::Event, Hash>>> {
+) -> Option<Vec<frame_system::EventRecord<runtime::Event, Hash>>> {
 	let key = storage::value_key(b"System", b"Events");
 	storage::read(key, client, at).await
 }

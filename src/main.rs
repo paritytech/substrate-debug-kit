@@ -161,15 +161,20 @@ async fn main() -> () {
 
 	// consolidate runtime version
 	let chain_version = network::get_runtime_version(&client, at).await;
-	let imported_version = node_runtime::VERSION;
+	let imported_version = primitives::runtime::VERSION;
 
 	if chain_version.spec_version != imported_version.spec_version {
 		log::warn!(
 			target: LOG_TARGET,
-			"Different runtime versions at latest head! \n## Code is using {:?}\n## Chain is using {:?}.
-This is not necessarily bad. Your code might work well if the block types are the same. Report an issue if you see an error.",
-			imported_version,
-			chain_version,
+			"Different runtime versions at latest head! \n## Code is using {:?}/{:?}-{:?}\n## Chain is using {:?}/{:?}-{:?}.
+		This is not necessarily bad. Your code might work well if the block types are the same. Report an issue if you see an error.",
+			imported_version.spec_name,
+			imported_version.spec_version,
+			imported_version.impl_version,
+			chain_version.spec_name,
+			chain_version.spec_version,
+			chain_version.impl_version,
+
 		);
 	}
 

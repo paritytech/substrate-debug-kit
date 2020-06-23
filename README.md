@@ -1,52 +1,53 @@
 # Offline Phragmen
 
 > Last update: Supports both polkadot and kusama using types from
-> [v0.8.8](https://github.com/paritytech/polkadot/releases/tag/v0.8.8).
+> [v0.8.11](https://github.com/paritytech/polkadot/releases/tag/v0.8.11).
 
 
 > Note that this software and repo is highly fragile and for now needs some manual work to be kept
 > up to date with new releases of the polkadot repo.
 
----
+> Substrate seminar session about this repo: [youtube.com/watch?v=6omrrY11HEg](youtube.com/watch?v=6omrrY11HEg)
 
+# Usage
 
-Simple script that scrapes the chain and runs the Phragmén election algorithm.
+A swiss army like tool for various debug and diagnosis operations on top of Polkadot and Kusama. You
+need to pass two arguments to specify the chain:
 
-The main aim of this project is to always work with the latest Kusama release, and later on
-Polkadot.
+1. `--network` will change the address format and token display name.
+2. `--no-default-features --features [polkadot/kusama]` will import the correct runtime. The default
+   is currently `polkadot`. This will only affect sub-commands that require the runtime, such as
+   those that read events, or need to decode `Call` and `Block`.
+3. `--uri` connect the the appropriate node based on the above two.
 
-Currently, it supports running phragmen on both staking and council election. see the usage details
-below for more info.
+Current features (most of each being a sub-command) include:
 
-Notable features for staking:
-- Can optionally run `equalize()` a number of times on the solution.
-- Can optionally `reduce()` the solution.
-- Can run the script on any block number. Default is always the latest finalized.
+- Staking: Running the staking election algorithm offchain. It directly scrapes the chain and uses
+  the same crate as used in substrate, namely `sp-npos-elections`, hence it is the most accurate
+  staking election prediction tool. It also supports operations such as `reduce()` and
+  `balance_solution()` operations that are done bu validators prior to solution submissions.
+- Council: Same as staking, but can run the election for council.
+- Dangling Nominators: displays the list of nominators who have voted for recently slashed
+  validators.
 
-# How to use
+All of the above stable commands support being passed a `--at` as well to perform the same operation
+at a specific block.
 
-Top level parameters as follows. These can be fed to all scripts. For staking/council dependent
-parameters, run the appropriate `--help` command to see the info (`cargo run -- staking --help`).
+And a range of unstable, playground features (see `fn run` in `playground.rs`):
 
-```
-offline-phragmen 1.0
-Parity Technologies <admin@parity.io>
-Diagnostic lab for everything election and phragmen related in a substrate chain.
+- `dust`: A `dust`-like tool to show the storage usage per module.
+- `last_election_submission`: scrapes all of the transactions in recent blocks that submitted
+  staking election solutions.
+- `account_balance_history`: shows tha balance history of an account.
 
+Run with `--help` for more info.
 
-OPTIONS:
-        --at <at>              scrape the data at the given block hash. Default will be the head of the chain
-    -n, --network <network>    network address format. Can be kusama|polkadot|substrate. Default is kusama
-    -u, --uri <URI>            websockets uri of the substrate node
+### Logging
 
-SUBCOMMANDS:
-    council                Runs the phragmen election for the elections-phragmen module (usually used for council).
-    dangling-nominators    Get the dangling nominators in staking. Don't forget to turn on logging.
-    help                   Prints this message or the help of the given subcommand(s)
-    playground             Runs any program that you put in src/subcommands/playground.rs. No parameters are
-                           accepted.
-    staking                Runs the phragmen election for staking validators and nominators.
-```
+Scripts output additional information as logs. You need to enable them by setting `RUST_LOG`
+environment variable.
+
+Also, you can always use `-v`, `-vv`, ... to get more output out of each script.
 
 ## Example usage
 
@@ -59,7 +60,7 @@ RUST_LOG=offline-phragmen=trace cargo run -- council --count 25
 - Run the staking election with no equalization at a particular block number
 
 ```
-RUST_LOG=offline-phragmen=trace cargo run  --at 8b7d6e14221b4fefc4b007660c80af6d4a9ac740c50b6e918f61d521553cd17e staking
+cargo run --at 8b7d6e14221b4fefc4b007660c80af6d4a9ac740c50b6e918f61d521553cd17e staking
 ```
 
 - Run the election with only 50 slots, and print all the nominator distributions
@@ -80,20 +81,11 @@ cargo run -- -vv staking --count 50 --reduce
 cargo run -- --uri wss://kusama-rpc.polkadot.io/ -vv staking --count 50 --reduce
 ```
 
-### Logging
-
-Scripts output additional information as logs. You need to enable them by setting `RUST_LOG`
-environment variable.
-
-Also, you can always use `-v`, `-vv`, ... to get more output out of each script.
-
 ### Connecting to a node
 
 By default it will attempt to connect to a locally running node running at `ws://127.0.0.1:9944`.
 
 Connect to a different node using the `--uri` argument e.g. `--uri wss://kusama-rpc.polkadot.io/`.
-
-### Uri Format
 
 - **`ws://`** prefix: plain (unencrypted) websockets connection.
 - **`wss://`** prefix: TLS (encrypted) websockets connection.

@@ -1,26 +1,28 @@
 #![allow(unused)]
 
-use crate::primitives::{Balance, Hash};
-use crate::{network, storage, Client, CommonConfig, Currency};
+use crate::primitives::{runtime, Balance, Hash};
+use crate::{network, storage, Client, CommonConfig, Currency, LOG_TARGET};
+use ansi_term::{Colour::*, Style};
 use codec::Encode;
-use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
+use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed, StorageEntryType};
 use frame_support;
 use hex_literal::hex;
 use network::get_account_data_at;
-use node_runtime::Call;
 use sp_core::{storage::StorageKey, Bytes};
 use sp_npos_elections::ElectionScore;
 
 /// Main run function of the sub-command.
 pub async fn run(client: &Client, _command_config: CommonConfig) {
-	last_election_submission(client).await;
+	// last_election_submission(client).await;
 	// account_balance_history(&k, crate::KUSAMA_GENESIS.into(), None, client).await;
-	// dust(client).await
+	dust(client).await
 	// coinbase(client).await
 }
 
 /// print the storage layout of chain.
 async fn dust(client: &Client) {
+	use separator::Separatable;
+
 	fn unwrap_decoded<B: Eq + PartialEq + std::fmt::Debug, O: Eq + PartialEq + std::fmt::Debug>(
 		input: frame_metadata::DecodeDifferent<B, O>,
 	) -> O {
@@ -31,11 +33,58 @@ async fn dust(client: &Client) {
 		}
 	}
 
+	fn get_prefix(indent: usize) -> &'static str {
+		match indent {
+			1 => "├─┬",
+			2 => "│ │──",
+			_ => panic!("Unexpected indent."),
+		}
+	}
+
+	const KB: usize = 1024;
+	const MB: usize = KB * KB;
+	const GB: usize = MB * MB;
+
+	const SPACING: usize = 4;
+
+	struct Size(usize);
+
+	impl std::fmt::Display for Size {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			if self.0 <= KB {
+				write!(f, "{: <3}B", self.0)?;
+			} else if self.0 <= MB {
+				write!(f, "{: <3}K", self.0 / KB)?;
+			} else if self.0 <= GB {
+				write!(f, "{: <3}M", self.0 / MB)?;
+			}
+
+			Ok(())
+		}
+	}
+
 	#[derive(Debug, Clone, Default)]
 	struct Module {
 		pub name: String,
 		pub size: usize,
 		pub items: Vec<Storage>,
+	}
+
+	impl std::fmt::Display for Module {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			let mod_style = Style::new().bold().italic().fg(Green);
+			write!(
+				f,
+				"{} {} {}\n",
+				mod_style.paint(format!("{}", Size(self.size))),
+				get_prefix(1),
+				mod_style.paint(self.name.clone())
+			)?;
+			for s in self.items.iter() {
+				write!(f, "{} {} {}\n", Size(s.size), get_prefix(2), s)?;
+			}
+			Ok(())
+		}
 	}
 
 	impl Module {
@@ -47,15 +96,58 @@ async fn dust(client: &Client) {
 		}
 	}
 
+	#[derive(Debug, Copy, Clone)]
+	pub enum StorageItem {
+		Value(usize),
+		Map(usize, usize),
+	}
+
+	impl std::fmt::Display for StorageItem {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			match self {
+				Self::Value(bytes) => write!(f, "Value({} bytes)", bytes.separated_string()),
+				Self::Map(bytes, count) => write!(
+					f,
+					"Value({} bytes, {} keys)",
+					bytes.separated_string(),
+					count
+				),
+			}
+		}
+	}
+
+	impl Default for StorageItem {
+		fn default() -> Self {
+			Self::Value(0)
+		}
+	}
+
 	#[derive(Debug, Clone, Default)]
 	struct Storage {
 		pub name: String,
 		pub size: usize,
+		pub item: StorageItem,
+	}
+
+	impl std::fmt::Display for Storage {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			let item_style = Style::new().italic();
+			write!(
+				f,
+				"{} => {}",
+				item_style.paint(self.name.clone()),
+				self.item
+			)
+		}
 	}
 
 	impl Storage {
-		fn new(name: String, size: usize) -> Self {
-			Self { name, size }
+		fn new(name: String, item: StorageItem) -> Self {
+			let size = match item {
+				StorageItem::Value(s) => s,
+				StorageItem::Map(s, _) => s,
+			};
+			Self { name, item, size }
 		}
 	}
 
@@ -71,14 +163,25 @@ async fn dust(client: &Client) {
 		let decode_modules = unwrap_decoded(inner.modules);
 		for module in decode_modules.into_iter() {
 			let name = unwrap_decoded(module.name);
+
+			// skip, if this module has no storage items.
+			if module.storage.is_none() {
+				log::warn!(
+					target: LOG_TARGET,
+					"Module with name {:?} seem to have no storage items.",
+					name
+				);
+				continue;
+			}
+
 			let storage = unwrap_decoded(module.storage.unwrap());
 			let prefix = unwrap_decoded(storage.prefix);
 			let entries = unwrap_decoded(storage.entries);
 			let mut module_info = Module::new(name.clone());
+
 			for storage_entry in entries.into_iter() {
 				let storage_name = unwrap_decoded(storage_entry.name);
 				let ty = storage_entry.ty;
-				println!("{:?} => {:?}", storage_name, ty);
 				let key_prefix =
 					storage::module_prefix_raw(prefix.as_bytes(), storage_name.as_bytes());
 				let pairs = storage::get_pairs(StorageKey(key_prefix.clone()), client, now).await;
@@ -86,17 +189,36 @@ async fn dust(client: &Client) {
 					.into_iter()
 					.map(|(k, v)| (k.0, v.0))
 					.collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+
 				let size = pairs.iter().fold(0, |acc, x| acc + x.1.len());
-				println!("Pair Count = {:?}", pairs.len());
-				println!("Encoded Size Sum = {:?}", size);
+
+				log::trace!(
+					target: LOG_TARGET,
+					"{:?}::{:?} => count: {}, size: {} bytes",
+					name,
+					storage_name,
+					pairs.len(),
+					size
+				);
 
 				module_info.size += size;
-				module_info.items.push(Storage::new(storage_name, size));
-
-				let rpc_sum = network::got_storage_size(StorageKey(key_prefix), client, now).await;
-				dbg!(rpc_sum);
+				let item = match ty {
+					StorageEntryType::Plain(_) => StorageItem::Value(size),
+					StorageEntryType::Map { .. } | StorageEntryType::DoubleMap { .. } => {
+						StorageItem::Map(size, pairs.len())
+					}
+				};
+				module_info.items.push(Storage::new(storage_name, item));
 			}
+			module_info.items.sort_by_key(|x| x.size);
+			module_info.items.reverse();
+			print!("{}", module_info);
+			modules.push(module_info);
 		}
+
+		modules.into_iter().for_each(|m| {
+			print!("{}", m);
+		});
 	} else {
 		log::error!("Invalid Metadata version");
 	}
@@ -201,7 +323,7 @@ async fn last_election_submission(client: &Client) {
 	let mut now = network::get_head(client).await;
 	let mut prev_era: pallet_staking::EraIndex = 0;
 
-	fn compare_scores(this: ElectionScore, that: ElectionScore) -> Vec<f64> {
+	fn compare_scores(that: ElectionScore, this: ElectionScore) -> Vec<f64> {
 		this.iter()
 			.map(|x| *x as i128)
 			.zip(that.iter().map(|x| *x as i128))
@@ -215,11 +337,11 @@ async fn last_election_submission(client: &Client) {
 		let block = network::get_block(client, now).await.block;
 		let parent_hash = block.header.parent_hash;
 		for e in block.extrinsics {
-			let call: Call = e.clone().function;
+			let call: runtime::Call = e.clone().function;
 
 			match call {
-				Call::Staking(staking_call) => {
-					if let node_runtime::staking::Call::submit_election_solution_unsigned(
+				runtime::Call::Staking(staking_call) => {
+					if let runtime::staking::Call::submit_election_solution_unsigned(
 						winners,
 						compact,
 						score,
@@ -239,7 +361,7 @@ async fn last_election_submission(client: &Client) {
 										if sp_npos_elections::is_score_better(
 											score.clone(),
 											prev_score,
-											<node_runtime::Runtime as pallet_staking::Trait>::MinSolutionScoreBump::get(),
+											<runtime::Runtime as pallet_staking::Trait>::MinSolutionScoreBump::get(),
 										) {
 											"✅"
 										} else {
@@ -265,9 +387,9 @@ async fn last_election_submission(client: &Client) {
 
 						let maybe_submission_event =
 							events.into_iter().map(|e| e.event).find_map(|event| {
-								if let node_runtime::Event::staking(staking_event) = event {
+								if let runtime::Event::staking(staking_event) = event {
 									match staking_event {
-										node_runtime::staking::Event::<node_runtime::Runtime>::SolutionStored(compute) => {
+										runtime::staking::Event::<runtime::Runtime>::SolutionStored(compute) => {
 											Some("SolutionStored")
 										}
 										_ => None,

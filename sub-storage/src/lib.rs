@@ -6,14 +6,15 @@ use jsonrpsee::{
 	common::{to_value as to_json_value, Params},
 	Client,
 };
+// TODO: we need not depend on this.
 use node_primitives::Hash;
 use sp_core::hashing::twox_128;
 use sp_core::storage::{StorageData, StorageKey};
 
 use std::fmt::Debug;
 
-type StorageKeyPair = Vec<(StorageKey, StorageData)>;
 // TODO: this should become generic.
+type StorageKeyPair = Vec<(StorageKey, StorageData)>;
 
 /// create key for a simple value.
 pub fn value_key(module: &[u8], storage: &[u8]) -> StorageKey {
@@ -151,7 +152,7 @@ mod tests {
 		let client = block_on(build_client());
 		let at = block_on(head(&client));
 		let key = value_key(b"System", b"Events");
-		let events = block_on(read::<Vec<EventRecord<node_runtime::Event, Hash>>>(
+		let events = block_on(read::<Vec<EventRecord<kusama_runtime::Event, Hash>>>(
 			key, &client, at,
 		));
 		assert!(events.is_some());
