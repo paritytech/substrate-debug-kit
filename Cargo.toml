@@ -21,6 +21,7 @@ clap = { version = "2.33.1", features = ["yaml"] }
 lazy_static = "1.4.0"
 textplots = "0.5.1"
 atomic_refcell = "0.1.6"
+ansi_term = "0.12.1"
 
 sub-storage = { path = "./sub-storage" }
 
