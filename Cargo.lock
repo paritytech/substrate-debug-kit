@@ -1999,7 +1999,6 @@ dependencies = [
  "pallet-balances",
  "pallet-identity",
  "pallet-indices",
- "pallet-session",
  "pallet-staking",
  "pallet-transaction-payment-rpc-runtime-api",
  "parity-scale-codec",

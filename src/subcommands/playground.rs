@@ -31,7 +31,7 @@ async fn validators_of_block(client: &Client, at: Hash) {
 
 	for (i, v) in validators.into_iter().enumerate() {
 		println!(
-			"#{} [{:?}] - {:?}",
+			"#{} [{}] - {:?}",
 			i + 1,
 			network::get_identity(&v, client, at).await,
 			v
