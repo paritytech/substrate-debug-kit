@@ -12,11 +12,31 @@ use sp_core::{storage::StorageKey, Bytes};
 use sp_npos_elections::ElectionScore;
 
 /// Main run function of the sub-command.
-pub async fn run(client: &Client, _command_config: CommonConfig) {
+pub async fn run(client: &Client, common: CommonConfig) {
 	// last_election_submission(client).await;
+	validators_of_block(client, common.at).await;
 	// account_balance_history(&k, crate::KUSAMA_GENESIS.into(), None, client).await;
-	dust(client).await
+	// dust(client).await
 	// coinbase(client).await
+}
+
+async fn validators_of_block(client: &Client, at: Hash) {
+	let validators = storage::read::<Vec<node_primitives::AccountId>>(
+		storage::value_key(b"Session", b"Validators"),
+		&client,
+		at,
+	)
+	.await
+	.expect("Validators must exist at each block.");
+
+	for (i, v) in validators.into_iter().enumerate() {
+		println!(
+			"#{} [{:?}] - {:?}",
+			i + 1,
+			network::get_identity(&v, client, at).await,
+			v
+		);
+	}
 }
 
 /// print the storage layout of chain.

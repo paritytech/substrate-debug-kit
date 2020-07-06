@@ -148,7 +148,7 @@ pub async fn query_info(
 	data.unwrap()
 }
 
-pub async fn got_storage_size(key: StorageKey, client: &Client, at: Hash) -> Option<u64> {
+pub async fn get_storage_size(key: StorageKey, client: &Client, at: Hash) -> Option<u64> {
 	let at = to_json_value(at).expect("Block hash serialization infallible");
 	let key = to_json_value(key).expect("extrinsic serialization infallible");
 	client
