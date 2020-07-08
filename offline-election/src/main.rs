@@ -89,14 +89,14 @@ impl std::str::FromStr for ParsedAccountId {
 	}
 }
 
-/// Offline elections app.
+/// Offline elections scripts.
 ///
 /// Provides utilities and debug tools around the election pallets of a substrate chain offline.
 ///
 /// Can be used to predict next elections, diagnose previous ones, and perform checks on validators
 /// and nominators.
 #[derive(Debug, StructOpt, Clone)]
-#[structopt(name = "offline-elections", about = "TODO")]
+#[structopt(name = "offline-elections")]
 pub struct Opt {
 	/// The block number at which the scrap should happen. Use only the hex value, no need for a
 	/// `0x` prefix.

@@ -12,6 +12,8 @@ const KB: usize = 1024;
 const MB: usize = KB * KB;
 const GB: usize = MB * MB;
 
+// TODO: print entire state size.
+
 pub const LOG_TARGET: &'static str = "sub-du";
 
 fn get_prefix(indent: usize) -> &'static str {

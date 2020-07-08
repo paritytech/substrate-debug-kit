@@ -1,92 +1,28 @@
-# Offline Phragmen
+# Substrate Debug-kit
 
-> Last update: Supports both polkadot and kusama using types from
-> [v0.8.11](https://github.com/paritytech/polkadot/releases/tag/v0.8.11).
+A collection of debug tools and libraries around substrate chains.
 
+> This project has evolved from the historical name `offline-phragmen`. I first created this repo
+> prior to [Kusama]()'s NPoS enabling as a tool to predict the outcome. Henceforth, it has evolved
+> into this repo. This functionality is still provided in the [`offline-elections`]() crate.
 
-> Note that this software and repo is highly fragile and for now needs some manual work to be kept
-> up to date with new releases of the polkadot repo. See [`UPDATE.md`](./UPDATE.md) to learn how.
+> Substrate seminar session about this repo prior to the overhaul:
+> [youtube.com/watch?v=6omrrY11HEg](youtube.com/watch?v=6omrrY11HEg)
 
-> Substrate seminar session about this repo: [youtube.com/watch?v=6omrrY11HEg](youtube.com/watch?v=6omrrY11HEg)
+## Overview
 
-# Usage
-
-A swiss army like tool for various debug and diagnosis operations on top of Polkadot and Kusama. You
-need to pass two arguments to specify the chain:
-
-1. `--network` will change the address format and token display name.
-2. `--no-default-features --features [polkadot/kusama]` will import the correct runtime. The default
-   is currently `polkadot`. This will only affect sub-commands that require the runtime, such as
-   those that read events, or need to decode `Call` and `Block`.
-3. `--uri` connect the the appropriate node based on the above two.
-
-Current features (most of each being a sub-command) include:
-
-- Staking: Running the staking election algorithm offchain. It directly scrapes the chain and uses
-  the same crate as used in substrate, namely `sp-npos-elections`, hence it is the most accurate
-  staking election prediction tool. It also supports operations such as `reduce()` and
-  `balance_solution()` operations that are done bu validators prior to solution submissions.
-- Council: Same as staking, but can run the election for council.
-- Dangling Nominators: displays the list of nominators who have voted for recently slashed
-  validators.
-
-All of the above stable commands support being passed a `--at` as well to perform the same operation
-at a specific block.
-
-And a range of unstable, playground features (see `fn run` in `playground.rs`):
-
-- `dust`: A `dust`-like tool to show the storage usage per module.
-- `last_election_submission`: scrapes all of the transactions in recent blocks that submitted
-  staking election solutions.
-- `account_balance_history`: shows tha balance history of an account.
-
-Run with `--help` for more info.
-
-### Logging
-
-Scripts output additional information as logs. You need to enable them by setting `RUST_LOG`
-environment variable.
-
-Also, you can always use `-v`, `-vv`, ... to get more output out of each script.
-
-## Example usage
-
-- Run the council election with 25 members instead of 20.
-
-```
-RUST_LOG=offline-phragmen=trace cargo run -- council --count 25
-```
-
-- Run the staking election with no equalization at a particular block number
-
-```
-cargo run --at 8b7d6e14221b4fefc4b007660c80af6d4a9ac740c50b6e918f61d521553cd17e staking
-```
-
-- Run the election with only 50 slots, and print all the nominator distributions
-
-```
-cargo run -- -vv staking --count 50
-```
-
-- Run the above again now with `reduce()` and see how most nominator edges are... reduced.
-
-```
-cargo run -- -vv staking --count 50 --reduce
-```
-
-- Run the above again now against a remote node.
-
-```
-cargo run -- --uri wss://kusama-rpc.polkadot.io/ -vv staking --count 50 --reduce
-```
-
-### Connecting to a node
-
-By default it will attempt to connect to a locally running node running at `ws://127.0.0.1:9944`.
-
-Connect to a different node using the `--uri` argument e.g. `--uri wss://kusama-rpc.polkadot.io/`.
-
-- **`ws://`** prefix: plain (unencrypted) websockets connection.
-- **`wss://`** prefix: TLS (encrypted) websockets connection.
-
+- **`sub-storage`**: This is the backbone of all of the crates in this repo. It provides a minimal
+  wrapper around substrate's storage rpc call for easier use. It provides all you need to read any
+  module's storage items, constants, and metadata. All of this is independent of any chain or pallet
+  and should work in any substrate chain. Additionally, it provide some pallet-dependent helpers as
+  well under the `helpers` feature (such as reading identity of an account).
+- **`sub-du`**: a [du]()-like tool that prints the storage usage of a chain. It reads all the info
+  it needs from metadata, so independent chain or runtime. Arguably not super useful, but I find it
+  cool.
+- **`offline-elections`**: The historical main purpose of this repo. It can scrape the staking
+  module's info and run election algorithms of `sp-npos-elections` offline. **Given the correct
+  parameters**, it can be used to predict the next validator set. It also provide other election
+  related functionalities. See the sub-commands for more info.
+- **`remote-externalities`**: [WIP] It provides the ability to write simple rust unit tests over a
+  specific state of a chain. It can be very useful to debug breaking changes and storage migrations.
+- **`laboratory`**: This is where I try new stuff.

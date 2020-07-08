@@ -1,5 +1,5 @@
 [package]
-name = "playground"
+name = "laboratory"
 version = "0.1.0"
 authors = ["kianenigma <kian.peymani@gmail.com>"]
 edition = "2018"

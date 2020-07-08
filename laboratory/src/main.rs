@@ -12,6 +12,20 @@ use sub_storage::{helpers, primitives::*};
 mod network;
 use network::runtime;
 
+#[derive(Debug, StructOpt, Clone)]
+#[structopt(name = "laboratory", about = "This is where I build new stuff.`")]
+pub struct Opt {
+	/// The block number at which the scrap should happen. Use only the hex value, no need for a
+	/// `0x` prefix.
+	#[structopt(long)]
+	at: Option<node_primitives::Hash>,
+
+	/// The node to connect to.
+	#[structopt(long, default_value = "ws://localhost:9944")]
+	uri: String,
+}
+
+
 #[async_std::main]
 async fn main() {
 	let opt = Opt::from_args();

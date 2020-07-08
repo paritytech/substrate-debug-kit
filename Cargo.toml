@@ -4,6 +4,6 @@ members = [
 	"sub-storage",
 	"offline-election",
 	"sub-du",
-	"playground",
 	"remote-externalities",
+	"laboratory",
 ]
