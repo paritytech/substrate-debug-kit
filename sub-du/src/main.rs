@@ -4,7 +4,6 @@ use separator::Separatable;
 use structopt::StructOpt;
 use sub_storage::get_head;
 use sub_storage::get_metadata;
-use sub_storage::helpers;
 use sub_storage::primitives;
 use sub_storage::StorageKey;
 
@@ -148,7 +147,7 @@ struct Opt {
 	at: Option<primitives::Hash>,
 
 	/// The node to connect to.
-	#[structopt(default_value = "ws://localhost:9944")]
+	#[structopt(long, default_value = "ws://localhost:9944")]
 	uri: String,
 
 	/// If true, intermediate values will be printed.
@@ -174,10 +173,12 @@ async fn main() -> () {
 
 	let mut modules: Vec<Module> = vec![];
 
-	// TODO: use at config.
-	let now = get_head(&client).await;
+	// potentially replace head with the given hash
+	let head = get_head(&client).await;
+	let at = opt.at.unwrap_or(head);
+	log::info!(target: LOG_TARGET, "Working at block {:?}", at);
 
-	let raw_metadata = get_metadata(&client, now).await.0;
+	let raw_metadata = get_metadata(&client, at).await.0;
 	let prefixed_metadata = <RuntimeMetadataPrefixed as codec::Decode>::decode(&mut &*raw_metadata)
 		.expect("Runtime Metadata failed to decode");
 	let metadata = prefixed_metadata.1;
@@ -208,7 +209,7 @@ async fn main() -> () {
 				let key_prefix =
 					sub_storage::module_prefix_raw(prefix.as_bytes(), storage_name.as_bytes());
 				let pairs =
-					sub_storage::get_pairs(StorageKey(key_prefix.clone()), &client, now).await;
+					sub_storage::get_pairs(StorageKey(key_prefix.clone()), &client, at).await;
 				let pairs = pairs
 					.into_iter()
 					.map(|(k, v)| (k.0, v.0))
