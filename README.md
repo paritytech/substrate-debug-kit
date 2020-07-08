@@ -2,12 +2,9 @@
 
 A collection of debug tools and libraries around substrate chains.
 
-> This project has evolved from the historical name `offline-phragmen`. I first created this repo
+> This project has evolved from the historical name **`offline-phragmen`**. I first created this repo
 > prior to [Kusama](https://kusama.network/)'s NPoS enabling as a tool to predict the outcome. Henceforth, it has evolved
 > into this repo. This functionality is still provided in the [`offline-elections`](https://github.com/paritytech/offline-phragmen/tree/master/offline-election) crate.
-
-> Substrate seminar session about this repo prior to the overhaul:
-> [youtube.com/watch?v=6omrrY11HEg](youtube.com/watch?v=6omrrY11HEg)
 
 ## Overview
 
