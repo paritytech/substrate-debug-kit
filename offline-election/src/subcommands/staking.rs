@@ -3,7 +3,7 @@
 use crate::{
 	network,
 	primitives::{AccountId, Balance, Hash},
-	storage, Client, CommonConfig, Currency, LOG_TARGET,
+	storage, Client, Currency, Opt, StakingConfig, LOG_TARGET,
 };
 use codec::Encode;
 use pallet_staking::slashing::SlashingSpans;
@@ -256,67 +256,22 @@ async fn prepare_offchain_submission(
 	compact
 }
 
-#[derive(Clone, Default)]
-struct CommandConfig {
-	pub iterations: usize,
-	pub reduce: bool,
-	pub count: usize,
-	pub min_count: usize,
-	pub output: Option<String>,
-	pub check_exposures: bool,
-	pub check_exposures_era: pallet_staking::EraIndex,
-}
-
-impl From<&clap::ArgMatches<'_>> for CommandConfig {
-	fn from(matches: &clap::ArgMatches<'_>) -> Self {
-		let iterations: usize = matches
-			.value_of("iterations")
-			.unwrap_or("0")
-			.parse()
-			.unwrap();
-
-		let reduce: bool = matches.is_present("reduce");
-
-		let output = matches.value_of("output").map(|o| o.to_string());
-
-		let count = matches.value_of("count").unwrap_or("0").parse().unwrap();
-
-		let min_count = matches
-			.value_of("min-count")
-			.unwrap_or("0")
-			.parse()
-			.unwrap();
-
-		let check_exposures = matches.is_present("check-exposures");
-		let check_exposures_era = matches
-			.value_of("check-exposures-era")
-			.unwrap_or("0")
-			.parse()
-			.expect("Era number must be valid");
-
-		Self {
-			iterations,
-			reduce,
-			count,
-			min_count,
-			output,
-			check_exposures,
-			check_exposures_era,
-		}
-	}
-}
-
 /// Main run function of the sub-command.
-pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::ArgMatches<'_>) {
-	let mut command_config = CommandConfig::from(matches);
-	let iterations = command_config.iterations;
-	let reduce = command_config.reduce;
-	let at = common_config.at;
-	let verbosity = common_config.verbosity;
+pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
+	let at = opt.at.unwrap();
+	let val_count = get_validator_count(&client, at).await as usize;
+	let verbosity = opt.verbosity;
+	let iterations = conf.iterations;
+	let count = conf.count.unwrap_or(val_count);
+	let reduce = conf.reduce;
 
-	// override validator count if not provided
-	if command_config.count == 0 {
-		command_config.count = get_validator_count(&client, at).await as usize;
+	if count != val_count {
+		log::warn!(
+			target: LOG_TARGET,
+			"`count` provided ({:?}) differs from validator count on-chain ({}).",
+			count,
+			val_count,
+		);
 	}
 
 	t_start!(data_scrape);
@@ -354,8 +309,8 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 		winners,
 		assignments,
 	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
-		command_config.count,
-		command_config.min_count,
+		count,
+		0,
 		candidates.clone(),
 		all_voters
 			.iter()
@@ -414,11 +369,11 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 
 	// only useful if we do check exposure.
 	let mut mismatch = 0usize;
-	let era = match command_config.check_exposures_era {
+	let era = match 0 {
 		0 => get_current_era(client, at).await,
 		era @ _ => era,
 	};
-	if command_config.check_exposures {
+	if false {
 		log::debug!(
 			target: LOG_TARGET,
 			"checking exposures against era index {}",
@@ -439,7 +394,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 		println!(
 			"#{} --> {} [{:?}] [total backing = {:?} ({} voters)] [own backing = {:?}]",
 			i + 1,
-			network::get_identity(&s, &client, at).await,
+			storage::helpers::get_identity(&s, &client, at).await,
 			s,
 			Currency(support.total),
 			other_count,
@@ -464,7 +419,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 			println!("");
 		}
 
-		if command_config.check_exposures {
+		if false {
 			let expo = exposure_of(&s, era, &client, at).await;
 			if support.total != expo.total {
 				mismatch += 1;
@@ -516,8 +471,8 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 	}
 
 	let compact = prepare_offchain_submission(
-		command_config.count,
-		command_config.min_count,
+		count,
+		0,
 		candidates.clone(),
 		all_voters.clone(),
 		staker_infos.clone(),
@@ -599,7 +554,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 	);
 
 	// potentially write to json file
-	if let Some(output_file) = command_config.output {
+	if let Some(output_file) = conf.output {
 		use std::fs::File;
 
 		let output = serde_json::json!({
@@ -607,7 +562,6 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 			"winners": elected_stashes,
 		});
 
-		serde_json::to_writer_pretty(&File::create(format!("{}", output_file)).unwrap(), &output)
-			.unwrap();
+		serde_json::to_writer_pretty(&File::create(output_file).unwrap(), &output).unwrap();
 	}
 }

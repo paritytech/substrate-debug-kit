@@ -1,5 +1,5 @@
 use crate::primitives::{AccountId, Balance, Hash};
-use crate::{network, storage, Client, CommonConfig, Currency, LOG_TARGET};
+use crate::{network, storage, Client, CouncilConfig, Currency, Opt, LOG_TARGET};
 use sp_npos_elections::*;
 use sp_runtime::traits::Convert;
 use std::collections::BTreeMap;
@@ -60,46 +60,12 @@ async fn get_voters_and_budget(
 		.collect::<Vec<_>>()
 }
 
-struct CommandConfig {
-	pub iterations: usize,
-	pub count: usize,
-	pub min_count: usize,
-	pub output: Option<String>,
-}
-
-impl From<&clap::ArgMatches<'_>> for CommandConfig {
-	fn from(matches: &clap::ArgMatches<'_>) -> Self {
-		let iterations: usize = matches
-			.value_of("iterations")
-			.unwrap_or("0")
-			.parse()
-			.unwrap();
-
-		let output = matches.value_of("output").map(|o| o.to_string());
-
-		let count = matches.value_of("count").unwrap_or("50").parse().unwrap();
-
-		let min_count = matches
-			.value_of("min-count")
-			.unwrap_or("0")
-			.parse()
-			.unwrap();
-
-		Self {
-			iterations,
-			count,
-			min_count,
-			output,
-		}
-	}
-}
-
 /// Main run function of the sub-command.
-pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::ArgMatches<'_>) {
-	let command_config = CommandConfig::from(matches);
-	let at = common_config.at;
-	let verbosity = common_config.verbosity;
-	let iterations = command_config.iterations;
+pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
+	let at = opt.at.unwrap();
+	let verbosity = opt.verbosity;
+	let iterations = conf.iterations;
+	let count = conf.count.unwrap();
 
 	let to_votes = |b: Balance| -> VoteWeight {
 		<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(b)
@@ -132,13 +98,8 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 	let ElectionResult {
 		winners,
 		assignments,
-	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
-		command_config.count,
-		command_config.min_count,
-		candidates,
-		all_voters,
-	)
-	.expect("Phragmen failed to elect.");
+	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(count, 0, candidates, all_voters)
+		.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
 
 	let elected_stashes = winners
@@ -165,7 +126,7 @@ pub async fn run(client: &Client, common_config: CommonConfig, matches: &clap::A
 		println!(
 			"#{} --> {} [{:?}][total backing = {:?}]",
 			i + 1,
-			network::get_identity(&s.0, &client, at).await,
+			storage::helpers::get_identity(&s.0, &client, at).await,
 			s.0,
 			Currency(supports.get(&s.0).unwrap().total),
 		);

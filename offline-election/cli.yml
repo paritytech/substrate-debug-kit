@@ -12,7 +12,7 @@ args:
     - network:
         short: n
         long: network
-        help: network address format. Can be kusama|polkadot|substrate. Default is kusama
+        help: network address format. Can be kusama|polkadot|substrate. Default is polkadot
         takes_value: true
     - at:
         long: at
@@ -80,7 +80,7 @@ subcommands:
                 long: iterations
                 help: number of post-processing iterations to run. Default is 0
                 takes_value: true
-    - playground:
-        about: Runs any program that you put in src/subcommands/playground.rs. No parameters are accepted.
     - dangling-nominators:
-        about: Get the dangling nominators in staking. Don't forget to turn on logging.
+            about: Get the dangling nominators in staking. Don't forget to turn on logging.
+    - current:
+            about: Get the current set.

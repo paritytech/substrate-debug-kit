@@ -9,12 +9,20 @@ use jsonrpsee::{
 // TODO: we need not depend on this.
 use node_primitives::Hash;
 use sp_core::hashing::twox_128;
-use sp_core::storage::{StorageData, StorageKey};
 
 use std::fmt::Debug;
 
+/// Helper's module.
+#[cfg(feature = "helpers")]
+pub mod helpers;
+
+// re-export all the primitives.
+pub use node_primitives as primitives;
+// re-export some stuff from sp-core.
+pub use sp_core::storage::{StorageData, StorageKey};
+
 // TODO: this should become generic.
-type StorageKeyPair = Vec<(StorageKey, StorageData)>;
+pub type StorageKeyPair = Vec<(StorageKey, StorageData)>;
 
 /// create key for a simple value.
 pub fn value_key(module: &[u8], storage: &[u8]) -> StorageKey {

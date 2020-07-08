@@ -1,10 +1,10 @@
 use crate::subcommands::staking::slashing_span_of;
-use crate::{primitives::AccountId, storage, Client, CommonConfig, LOG_TARGET};
+use crate::{primitives::AccountId, storage, Client, Opt, LOG_TARGET};
 use pallet_staking::Nominations;
 
 /// Main run function of the sub-command.
-pub async fn run(client: &Client, common_config: CommonConfig) {
-	let at = common_config.at;
+pub async fn run(client: &Client, opt: Opt) {
+	let at = opt.at.unwrap();
 	let nominators: Vec<(AccountId, Nominations<AccountId>)> =
 		storage::enumerate_map::<AccountId, Nominations<AccountId>>(
 			b"Staking",
