@@ -1,14 +1,11 @@
 //! Some helper functions for common substrate chains.
 
 use ansi_term::Colour;
-use codec::Decode;
 use frame_support::{Blake2_128Concat, Twox64Concat};
 use frame_system::AccountInfo;
-use jsonrpsee::common::{to_value as to_json_value, Params};
 use jsonrpsee::Client;
 use node_primitives::{AccountId, Balance, Hash, Nonce};
 use pallet_balances::AccountData;
-use sp_core::storage::{StorageData, StorageKey};
 
 /// Get the nick of a given account id.
 pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
@@ -78,51 +75,6 @@ pub async fn get_identity(who: &AccountId, client: &Client, at: Hash) -> String 
 	} else {
 		"NO_IDENT".to_string()
 	}
-}
-
-/// Get the latest finalized head of the chain.
-///
-/// This is technically not a storage operation but RPC, but we will keep it here since it is very
-/// useful in lots of places.
-pub async fn get_head(client: &Client) -> Hash {
-	let data: Option<StorageData> = client
-		.request("chain_getFinalizedHead", Params::None)
-		.await
-		.expect("get chain finalized head request failed");
-	let now_raw = data.expect("Should always get the head hash").0;
-	<Hash as Decode>::decode(&mut &*now_raw).expect("Block hash should decode")
-}
-
-/// Get the metadata of a chain.
-pub async fn get_metadata(client: &Client, at: Hash) -> sp_core::Bytes {
-	let at = to_json_value(at).expect("Block hash serialization infallible");
-	let data: Option<sp_core::Bytes> = client
-		.request("state_getMetadata", Params::Array(vec![at]))
-		.await
-		.expect("Failed to decode block");
-
-	data.unwrap()
-}
-
-/// Get the runtime version at the given block.
-pub async fn get_runtime_version(client: &Client, at: Hash) -> sp_version::RuntimeVersion {
-	let at = to_json_value(at).expect("Block hash serialization infallible");
-	let data: Option<sp_version::RuntimeVersion> = client
-		.request("state_getRuntimeVersion", Params::Array(vec![at]))
-		.await
-		.expect("Failed to decode block");
-
-	data.unwrap()
-}
-
-/// Get the size of a storage map.
-pub async fn get_storage_size(key: StorageKey, client: &Client, at: Hash) -> Option<u64> {
-	let at = to_json_value(at).expect("Block hash serialization infallible");
-	let key = to_json_value(key).expect("extrinsic serialization infallible");
-	client
-		.request("state_getStorageSize", Params::Array(vec![key, at]))
-		.await
-		.unwrap()
 }
 
 /// Get the account data at the given block.

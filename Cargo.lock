@@ -4420,7 +4420,6 @@ dependencies = [
  "frame-system",
  "hex-literal",
  "jsonrpsee",
- "kusama-runtime",
  "pallet-balances",
  "pallet-identity",
  "parity-scale-codec",

@@ -2,6 +2,8 @@ use ansi_term::{Colour::*, Style};
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed, StorageEntryType};
 use separator::Separatable;
 use structopt::StructOpt;
+use sub_storage::get_head;
+use sub_storage::get_metadata;
 use sub_storage::helpers;
 use sub_storage::primitives;
 use sub_storage::StorageKey;
@@ -173,9 +175,9 @@ async fn main() -> () {
 	let mut modules: Vec<Module> = vec![];
 
 	// TODO: use at config.
-	let now = helpers::get_head(&client).await;
+	let now = get_head(&client).await;
 
-	let raw_metadata = helpers::get_metadata(&client, now).await.0;
+	let raw_metadata = get_metadata(&client, now).await.0;
 	let prefixed_metadata = <RuntimeMetadataPrefixed as codec::Decode>::decode(&mut &*raw_metadata)
 		.expect("Runtime Metadata failed to decode");
 	let metadata = prefixed_metadata.1;

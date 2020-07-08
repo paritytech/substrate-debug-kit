@@ -224,7 +224,7 @@ async fn main() -> () {
 	let client: Client = jsonrpsee::raw::RawClient::new(transport).into();
 
 	// get the latest block hash
-	let head = storage::helpers::get_head(&client).await;
+	let head = storage::get_head(&client).await;
 
 	// potentially replace head with the given hash
 	let at = opt.at.unwrap_or(head);

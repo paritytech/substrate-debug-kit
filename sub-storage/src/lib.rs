@@ -1,4 +1,10 @@
-//! Some helpers to read storage.
+//! # Sub-Storage.
+//!
+//! A thing wrapper around substrate's RPC calls that work with storage. This module is an
+//! equivalent ot the polkadojs-api, in Rust.
+//!
+//! The base functions of this crate make no assumption about the runtime. Some runtime-dependent
+//! functions are provided under the `helpers` module.
 
 use codec::Decode;
 use frame_support::StorageHasher;
@@ -6,10 +12,8 @@ use jsonrpsee::{
 	common::{to_value as to_json_value, Params},
 	Client,
 };
-// TODO: we need not depend on this.
 use node_primitives::Hash;
 use sp_core::hashing::twox_128;
-
 use std::fmt::Debug;
 
 /// Helper's module.
@@ -20,9 +24,6 @@ pub mod helpers;
 pub use node_primitives as primitives;
 // re-export some stuff from sp-core.
 pub use sp_core::storage::{StorageData, StorageKey};
-
-// TODO: this should become generic.
-pub type StorageKeyPair = Vec<(StorageKey, StorageData)>;
 
 /// create key for a simple value.
 pub fn value_key(module: &[u8], storage: &[u8]) -> StorageKey {
@@ -86,7 +87,11 @@ pub async fn read<T: Decode>(key: StorageKey, client: &Client, at: Hash) -> Opti
 	<T as Decode>::decode(&mut encoded.as_slice()).ok()
 }
 
-pub async fn get_pairs(prefix: StorageKey, client: &Client, at: Hash) -> StorageKeyPair {
+pub async fn get_pairs(
+	prefix: StorageKey,
+	client: &Client,
+	at: Hash,
+) -> Vec<(StorageKey, StorageData)> {
 	let serialized_prefix = to_json_value(prefix).expect("StorageKey serialization infallible");
 	let at = to_json_value(at).expect("Block hash serialization infallible");
 	client
@@ -127,13 +132,58 @@ where
 		.collect::<Result<Vec<(K, V)>, &'static str>>()
 }
 
+/// Get the latest finalized head of the chain.
+///
+/// This is technically not a storage operation but RPC, but we will keep it here since it is very
+/// useful in lots of places.
+pub async fn get_head(client: &Client) -> Hash {
+	let data: Option<StorageData> = client
+		.request("chain_getFinalizedHead", Params::None)
+		.await
+		.expect("get chain finalized head request failed");
+	let now_raw = data.expect("Should always get the head hash").0;
+	<Hash as Decode>::decode(&mut &*now_raw).expect("Block hash should decode")
+}
+
+/// Get the metadata of a chain.
+pub async fn get_metadata(client: &Client, at: Hash) -> sp_core::Bytes {
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let data: Option<sp_core::Bytes> = client
+		.request("state_getMetadata", Params::Array(vec![at]))
+		.await
+		.expect("Failed to decode block");
+
+	data.unwrap()
+}
+
+/// Get the runtime version at the given block.
+pub async fn get_runtime_version(client: &Client, at: Hash) -> sp_version::RuntimeVersion {
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let data: Option<sp_version::RuntimeVersion> = client
+		.request("state_getRuntimeVersion", Params::Array(vec![at]))
+		.await
+		.expect("Failed to decode block");
+
+	data.unwrap()
+}
+
+/// Get the size of a storage map.
+pub async fn get_storage_size(key: StorageKey, client: &Client, at: Hash) -> Option<u64> {
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let key = to_json_value(key).expect("extrinsic serialization infallible");
+	client
+		.request("state_getStorageSize", Params::Array(vec![key, at]))
+		.await
+		.unwrap()
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
 	use async_std::task::block_on;
 	use jsonrpsee::{raw::RawClient, transport::ws::WsTransportClient, Client};
 
-	use frame_system::{AccountInfo, EventRecord};
+	use frame_system::AccountInfo;
 	use node_primitives::{Balance, Nonce};
 	use pallet_balances::AccountData;
 
@@ -146,30 +196,19 @@ mod tests {
 		RawClient::new(transport).into()
 	}
 
-	async fn head(client: &Client) -> Hash {
-		let data: Option<StorageData> = client
-			.request("chain_getFinalizedHead", Params::None)
-			.await
-			.expect("get chain finalized head request failed");
-		let now_raw = data.expect("Should always get the head hash").0;
-		<Hash as Decode>::decode(&mut &*now_raw).expect("Block hash decode infallible")
-	}
-
 	#[test]
 	fn storage_value_read_works() {
 		let client = block_on(build_client());
-		let at = block_on(head(&client));
-		let key = value_key(b"System", b"Events");
-		let events = block_on(read::<Vec<EventRecord<kusama_runtime::Event, Hash>>>(
-			key, &client, at,
-		));
-		assert!(events.is_some());
+		let at = block_on(get_head(&client));
+		let key = value_key(b"Balances", b"TotalIssuance");
+		let issuance = block_on(read::<Balance>(key, &client, at));
+		assert!(issuance.is_some());
 	}
 
 	#[test]
 	fn storage_map_read_works() {
 		let client = block_on(build_client());
-		let at = block_on(head(&client));
+		let at = block_on(get_head(&client));
 		// web3 foundation technical account.
 		let account =
 			hex_literal::hex!["8a0e42d190d3ecaebf11d3834f4b992e0fab469e6bf17056d402cb172b827a22"];

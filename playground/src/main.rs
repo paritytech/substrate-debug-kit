@@ -64,6 +64,7 @@ async fn account_balance_history(
 	client: &Client,
 ) {
 	use helpers::*;
+	use sub_storage::get_head;
 	use textplots::{Chart, Plot, Shape};
 
 	let mut now = from.unwrap_or_else(|| async_std::task::block_on(get_head(client)));
@@ -134,7 +135,7 @@ async fn last_election_submission(client: &Client) {
 
 	let mut era_dumps: Vec<EraInfo> = vec![];
 
-	let mut now = sub_storage::helpers::get_head(client).await;
+	let mut now = sub_storage::get_head(client).await;
 	let mut prev_era: pallet_staking::EraIndex = 0;
 
 	fn compare_scores(that: ElectionScore, this: ElectionScore) -> Vec<f64> {
