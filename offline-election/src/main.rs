@@ -82,6 +82,7 @@ impl std::str::FromStr for ParsedAccountId {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		use sp_core::crypto::Ss58Codec;
+		// TODO: finish this: accept also hex string if this fails.
 		<AccountId as Ss58Codec>::from_ss58check(s)
 			.map_err(|_| "invalid ss58 address")
 			.map(|acc| Self(acc))
@@ -103,7 +104,7 @@ pub struct Opt {
 	at: Option<primitives::Hash>,
 
 	/// The node to connect to.
-	#[structopt(short, long, default_value = "ws://localhost:9944")]
+	#[structopt(long, default_value = "ws://localhost:9944")]
 	uri: String,
 
 	/// Network address format. Can be kusama|polkadot|substrate.
@@ -181,7 +182,8 @@ pub struct StakingConfig {
 /// Arguments that can be passed to the council sub-command.
 #[derive(Debug, StructOpt, Clone)]
 pub struct CouncilConfig {
-	/// Count of member/validators to elect. Default is `Staking.validatorCount`.
+	/// Count of member/validators to elect. Default is
+	/// `ElectionsPhragmen.desired_members()` + `ElectionsPhragmen.desired_runners_up()`.
 	#[structopt(short, long)]
 	count: Option<usize>,
 

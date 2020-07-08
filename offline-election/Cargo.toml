@@ -39,3 +39,6 @@ sp-npos-elections = { git = "https://github.com/paritytech/substrate", rev = "31
 frame-support = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
 frame-system = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
 pallet-staking = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+
+[dev-dependencies]
+assert_cmd = "1.0.1"

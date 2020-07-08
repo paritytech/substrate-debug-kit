@@ -1,6 +1,6 @@
 use crate::{primitives::Balance, Client, Currency, Opt, LOG_TARGET};
 use sp_runtime::traits::Bounded;
-use sub_storage::{get_head, helpers::*};
+use sub_storage::helpers::*;
 
 /// Main run function of the sub-command.
 pub async fn run(client: &Client, config: Opt) {

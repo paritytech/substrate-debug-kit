@@ -13,7 +13,9 @@ sp-core = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded19
 frame-support = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
 frame-system = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
 sp-version = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+frame-metadata = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
 
+# Optional for helpers only.
 pallet-identity = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3", optional = true }
 pallet-balances = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3", optional = true }
 ansi_term = { version = "0.12.1", optional = true }

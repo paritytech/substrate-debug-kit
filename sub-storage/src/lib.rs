@@ -132,6 +132,52 @@ where
 		.collect::<Result<Vec<(K, V)>, &'static str>>()
 }
 
+/// Unwrap an decode a metadata entry.
+pub fn unwrap_decoded<B: Eq + PartialEq + std::fmt::Debug, O: Eq + PartialEq + std::fmt::Debug>(
+	input: frame_metadata::DecodeDifferent<B, O>,
+) -> O {
+	if let frame_metadata::DecodeDifferent::Decoded(o) = input {
+		o
+	} else {
+		panic!("Data is not decoded: {:?}", input)
+	}
+}
+
+pub async fn get_const<T: Decode>(
+	client: &Client,
+	module: &str,
+	name: &str,
+	at: Hash,
+) -> Option<T> {
+	use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
+	let raw_metadata = get_metadata(client, at).await.0;
+	let prefixed_metadata = <RuntimeMetadataPrefixed as codec::Decode>::decode(&mut &*raw_metadata)
+		.expect("Runtime Metadata failed to decode");
+	let metadata = prefixed_metadata.1;
+
+	if let RuntimeMetadata::V11(inner) = metadata {
+		let decode_modules = unwrap_decoded(inner.modules);
+		for module_encoded in decode_modules.into_iter() {
+			let mod_name = unwrap_decoded(module_encoded.name);
+			if mod_name == module {
+				let consts = unwrap_decoded(module_encoded.constants);
+
+				for c in consts {
+					let cname = unwrap_decoded(c.name);
+					let cvalue = unwrap_decoded(c.value);
+					if name == cname {
+						return Decode::decode(&mut &*cvalue).ok();
+					}
+				}
+			}
+		}
+	} else {
+		panic!("Unsupported metadata version. Please make an issue.")
+	}
+
+	None
+}
+
 /// Get the latest finalized head of the chain.
 ///
 /// This is technically not a storage operation but RPC, but we will keep it here since it is very
@@ -188,6 +234,7 @@ mod tests {
 	use pallet_balances::AccountData;
 
 	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
+	// const TEST_URI: &'static str = "ws://localhost:9944";
 
 	async fn build_client() -> Client {
 		let transport = WsTransportClient::new(TEST_URI)
@@ -209,7 +256,7 @@ mod tests {
 	fn storage_map_read_works() {
 		let client = block_on(build_client());
 		let at = block_on(get_head(&client));
-		// web3 foundation technical account.
+		// web3 foundation technical account in kusama.
 		let account =
 			hex_literal::hex!["8a0e42d190d3ecaebf11d3834f4b992e0fab469e6bf17056d402cb172b827a22"];
 		let data = block_on(read::<AccountInfo<Nonce, AccountData<Balance>>>(
@@ -218,5 +265,40 @@ mod tests {
 			at,
 		));
 		assert!(data.is_some());
+	}
+
+	#[test]
+	fn get_storage_size_works_map() {
+		unimplemented!();
+	}
+
+	#[test]
+	fn get_const_works() {
+		let client = block_on(build_client());
+		let at = block_on(get_head(&client));
+
+		assert!(block_on(get_const::<u32>(
+			&client,
+			&"ElectionsPhragmen",
+			&"DesiredMembers",
+			at
+		))
+		.is_some());
+
+		assert!(block_on(get_const::<u32>(
+			&client,
+			&"ElectionsPhragmen",
+			&"DesiredMemberss",
+			at
+		))
+		.is_none());
+
+		assert!(block_on(get_const::<u32>(
+			&client,
+			&"ElectionsPhragmennn",
+			&"DesiredMembers",
+			at
+		))
+		.is_none());
 	}
 }

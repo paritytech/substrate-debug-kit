@@ -22,14 +22,6 @@ struct Staker {
 	stake: Balance,
 }
 
-#[allow(dead_code)]
-fn empty_ext_with_runtime<T: frame_system::Trait>() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::default()
-		.build_storage::<T>()
-		.unwrap()
-		.into()
-}
-
 fn assert_supports_total_equal(s1: &SupportMap<AccountId>, s2: &SupportMap<AccountId>) {
 	assert!(s1.iter().all(|(v, s)| s2.get(v).unwrap().total == s.total))
 }
@@ -373,6 +365,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		0 => get_current_era(client, at).await,
 		era @ _ => era,
 	};
+	// TODO: remove this or fix it.
 	if false {
 		log::debug!(
 			target: LOG_TARGET,
@@ -480,44 +473,6 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		at,
 	)
 	.await;
-
-	// use node_runtime::Runtime;
-	// empty_ext_with_runtime::<Runtime>().execute_with(|| {
-	// 	use frame_support::assert_ok;
-	// 	use frame_support::storage::StorageValue;
-	// 	use frame_support::traits::Currency;
-	// 	use node_runtime::{Balances, Staking};
-	// 	use sp_runtime::traits::Dispatchable;
-
-	// 	for c in candidates.clone() {
-	// 		let e = staker_infos.get(&c).unwrap();
-	// 		let ctrl = e.ctrl.as_ref().unwrap();
-	// 		let stake = e.stake;
-	// 		Balances::make_free_balance_be(&c, stake);
-
-	// 		let call = node_runtime::Call::Staking(pallet_staking::Call::bond(
-	// 			pallet_indices::Address::<Runtime>::Id(ctrl.clone()),
-	// 			stake,
-	// 			Default::default(),
-	// 		));
-	// 		println!("Bonding {:?}/{:?} with {:?}", &c, &ctrl, &stake);
-	// 		let o = frame_system::Origin::<Runtime>::Signed(c);
-	// 		assert_ok!(Dispatchable::dispatch(call, o.into()));
-
-	// 		<pallet_staking::EraElectionStatus<Runtime>>::put(
-	// 			pallet_staking::ElectionStatus::Open(1),
-	// 		);
-	// 	}
-
-	// 	assert!(Staking::check_and_replace_solution(
-	// 		Default::default(),
-	// 		compact.clone(),
-	// 		pallet_staking::ElectionCompute::OnChain,
-	// 		Default::default(),
-	// 		Default::default(),
-	// 	)
-	// 	.is_ok());
-	// });
 
 	log::info!(
 		target: LOG_TARGET,

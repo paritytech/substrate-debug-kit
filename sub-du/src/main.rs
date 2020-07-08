@@ -5,6 +5,7 @@ use structopt::StructOpt;
 use sub_storage::get_head;
 use sub_storage::get_metadata;
 use sub_storage::primitives;
+use sub_storage::unwrap_decoded;
 use sub_storage::StorageKey;
 
 const KB: usize = 1024;
@@ -12,16 +13,6 @@ const MB: usize = KB * KB;
 const GB: usize = MB * MB;
 
 pub const LOG_TARGET: &'static str = "sub-du";
-
-fn unwrap_decoded<B: Eq + PartialEq + std::fmt::Debug, O: Eq + PartialEq + std::fmt::Debug>(
-	input: frame_metadata::DecodeDifferent<B, O>,
-) -> O {
-	if let frame_metadata::DecodeDifferent::Decoded(o) = input {
-		o
-	} else {
-		panic!("Data is not decoded: {:?}", input)
-	}
-}
 
 fn get_prefix(indent: usize) -> &'static str {
 	match indent {
@@ -260,6 +251,6 @@ async fn main() -> () {
 			print!("{}", m);
 		});
 	} else {
-		log::error!("Invalid Metadata version");
+		log::error!("Unsupported Metadata version");
 	}
 }

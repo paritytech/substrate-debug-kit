@@ -65,7 +65,18 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 	let at = opt.at.unwrap();
 	let verbosity = opt.verbosity;
 	let iterations = conf.iterations;
-	let count = conf.count.unwrap();
+	let desired_members =
+		sub_storage::get_const::<u32>(client, "ElectionsPhragmen", "DesiredMembers", at)
+			.await
+			.expect("DesiredMembers const must exist.");
+
+	let desired_runners_up =
+		sub_storage::get_const::<u32>(client, "ElectionsPhragmen", "DesiredRunnersUp", at)
+			.await
+			.expect("DesiredRunnersUp const must exist.");
+	let count = conf
+		.count
+		.unwrap_or_else(|| (desired_members + desired_runners_up) as usize);
 
 	let to_votes = |b: Balance| -> VoteWeight {
 		<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(b)
