@@ -3,8 +3,8 @@
 A collection of debug tools and libraries around substrate chains.
 
 > This project has evolved from the historical name `offline-phragmen`. I first created this repo
-> prior to [Kusama]()'s NPoS enabling as a tool to predict the outcome. Henceforth, it has evolved
-> into this repo. This functionality is still provided in the [`offline-elections`]() crate.
+> prior to [Kusama](https://kusama.network/)'s NPoS enabling as a tool to predict the outcome. Henceforth, it has evolved
+> into this repo. This functionality is still provided in the [`offline-elections`](https://github.com/paritytech/offline-phragmen/tree/master/offline-election) crate.
 
 > Substrate seminar session about this repo prior to the overhaul:
 > [youtube.com/watch?v=6omrrY11HEg](youtube.com/watch?v=6omrrY11HEg)
@@ -16,7 +16,7 @@ A collection of debug tools and libraries around substrate chains.
   module's storage items, constants, and metadata. All of this is independent of any chain or pallet
   and should work in any substrate chain. Additionally, it provide some pallet-dependent helpers as
   well under the `helpers` feature (such as reading identity of an account).
-- **`sub-du`**: a [du]()-like tool that prints the storage usage of a chain. It reads all the info
+- **`sub-du`**: a [**d**isk-**u**sage](https://en.wikipedia.org/wiki/Du_(Unix))-like tool that prints the storage usage of a chain. It reads all the info
   it needs from metadata, so independent chain or runtime. Arguably not super useful, but I find it
   cool.
 - **`offline-elections`**: The historical main purpose of this repo. It can scrape the staking
