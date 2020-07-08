@@ -2,7 +2,7 @@
 
 Run election algorithms of substrate (all under `sp-npos-elections`) offline.
 
-> Substrate seminar about offchain phragmen and how the staking pallet works in substrate. [https://www.youtube.com/watch?v=MjOvVhc1oXw](https://www.youtube.com/watch?v=MjOvVhc1oXw).
+> Substrate seminar about offchain phragmen and how the staking pallet works in substrate. [youtube.com/watch?v=MjOvVhc1oXw](https://www.youtube.com/watch?v=MjOvVhc1oXw).
 
 > Substrate seminar session about this repo prior to the overhaul (`offline-phragmen`):
 > [youtube.com/watch?v=6omrrY11HEg](youtube.com/watch?v=6omrrY11HEg)
