@@ -198,7 +198,7 @@ pub struct CouncilConfig {
 
 #[async_std::main]
 async fn main() -> () {
-	env_logger::builder()
+	env_logger::Builder::from_default_env()
 		.filter_level(log::LevelFilter::Debug)
 		.format_module_path(false)
 		.format_level(true)

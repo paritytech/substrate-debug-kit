@@ -10,11 +10,22 @@ Run election algorithms of substrate (all under `sp-npos-elections`) offline.
 
 ### Builders
 
-Several tools have already built on top of this repo, such as polkadot.por and TODO.
+Several tools have already built on top of this repo, such:
 
-Note that the npos results generate by this repo will not be exactly equal to that of polkadot and
-kusama. This is highly dependent on the arguments passed to the `staking` sub-command. See
-[`PHRAGMEN.md`]() for more detail.
+- https://polkadot.pro/phragmen.php
+- https://polkadot.staking4all.org/
+
+Note that the npos results generate by this repo or any of the above tools will not be exactly equal
+to that of polkadot and kusama. This is highly dependent on the arguments passed to the `staking`
+sub-command. The NPoS solution of both polkadot and kusama is being computed in a non-deterministic
+way.
+
+As of this writing, the validator election of Polkadot/Kusama is as such: seq-phragmen -> random
+iterations of balancing -> reduce. This translates to:
+
+```
+cargo run -- staking -i 10 -r
+```
 
 ## Usage
 
@@ -70,7 +81,7 @@ TODO:
 
 ## Example usage
 
-- Run the council election with 25 members instead of 20.
+- Run the council election with 25 members.
 
 ```
 RUST_LOG=offline-phragmen=trace cargo run -- council --count 25
@@ -101,6 +112,9 @@ cargo run -- --uri wss://kusama-rpc.polkadot.io/ -vv staking --count 50 --reduce
 ```
 
 ## Connecting to a node
+
+> Both Polkadot and Kusama are growing fast and scraping the data is becoming harder and harder. I
+> really recommend you to try this script against a local node, or be prepared to wait for a while.
 
 By default it will attempt to connect to a locally running node running at `ws://127.0.0.1:9944`.
 
