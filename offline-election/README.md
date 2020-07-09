@@ -27,6 +27,10 @@ iterations of balancing -> reduce. This translates to:
 cargo run -- staking -i 10 -r
 ```
 
+And **if executed at the correct time** (i.e. while the election window is open), this should *accurately
+predict the next validator set*, but the nominator stake distribution will be different, because the
+random number of iterations is not known.
+
 ## Usage
 
 Simply run `--help`.
