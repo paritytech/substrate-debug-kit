@@ -1,4 +1,4 @@
-# Substrate Debug-kit
+# Substrate debug-kit 🛠⚙️
 
 A collection of debug tools and libraries around substrate chains.
 

@@ -1,3 +1,12 @@
+//! An equivalent of `TestExternalities` that can load its state from a remote substrate based
+//! chain.
+//!
+//! - For now, the `build()` method os not async and will block. This is so that the test code would
+//!   be freed from dealing with an executor or async tests.
+//! - You typically have two options, either use a mock runtime file. In this case, you only care
+//!   about the types that you want to query and they must be the same as the one used in chain. Or,
+//!   simply use the runtime struct of the chain that you want to scrape.
+
 use log::*;
 use sp_core::hashing::twox_128;
 use sp_core::storage::StorageKey;
@@ -5,6 +14,12 @@ use sp_io::TestExternalities;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 type Hash = sp_core::H256;
+
+macro_rules! wait {
+	($e:expr) => {
+		async_std::task::block_on($e)
+	};
+}
 
 const LOG_TARGET: &'static str = "remote-ext";
 
@@ -42,6 +57,7 @@ impl<T: ?Sized + AsRef<[u8]>> HexDisplayExt for T {
 	}
 }
 
+/// Builder for remote-externalities.
 #[derive(Debug, Default)]
 pub struct Builder {
 	at: Option<Hash>,
@@ -51,20 +67,28 @@ pub struct Builder {
 }
 
 impl Builder {
+	/// Create a new builder.
 	pub fn new() -> Self {
 		Default::default()
 	}
 
+	/// Scrape the chain at the given block hash.
+	///
+	/// If not set, latest finalized will be used.
 	pub fn at(mut self, at: Hash) -> Self {
 		self.at = Some(at);
 		self
 	}
 
+	/// Look for a chain at the given URI.
+	///
+	/// If not set, `ws://localhost:9944` will be used.
 	pub fn uri(mut self, uri: String) -> Self {
 		self.uri = Some(uri);
 		self
 	}
 
+	/// Inject a manual list of key and values to the storage.
 	pub fn inject(mut self, injections: &[(Vec<u8>, Vec<u8>)]) -> Self {
 		for i in injections {
 			self.inject.push(i.clone());
@@ -72,21 +96,24 @@ impl Builder {
 		self
 	}
 
+	/// Scrape only this module.
+	///
+	/// If used multiple times, all of the given modules will be used, else the entire chain.
 	pub fn module(mut self, module: &str) -> Self {
 		self.module_filter.push(module.to_string());
 		self
 	}
 
-	pub async fn build(self) -> TestExternalities {
+	/// Build the test externalities.
+	pub fn build(self) -> TestExternalities {
 		let mut ext = TestExternalities::new_empty();
 		let uri = self.uri.unwrap_or(String::from("ws://localhost:9944"));
 
-		let transport = jsonrpsee::transport::ws::WsTransportClient::new(&uri)
-			.await
+		let transport = wait!(jsonrpsee::transport::ws::WsTransportClient::new(&uri))
 			.expect("Failed to connect to client");
 		let client: jsonrpsee::Client = jsonrpsee::raw::RawClient::new(transport).into();
 
-		let head = sub_storage::get_head(&client).await;
+		let head = wait!(sub_storage::get_head(&client));
 		let at = self.at.unwrap_or(head);
 
 		info!(target: LOG_TARGET, "connecting to node {} at {:?}", uri, at);
@@ -101,8 +128,11 @@ impl Builder {
 					f,
 					hashed_prefix.hex_display()
 				);
-				let module_kv =
-					sub_storage::get_pairs(StorageKey(hashed_prefix.to_vec()), &client, at).await;
+				let module_kv = wait!(sub_storage::get_pairs(
+					StorageKey(hashed_prefix.to_vec()),
+					&client,
+					at
+				));
 
 				for kv in module_kv.into_iter().map(|(k, v)| (k.0, v.0)) {
 					filtered_kv.push(kv);
@@ -111,11 +141,14 @@ impl Builder {
 			filtered_kv
 		} else {
 			debug!(target: LOG_TARGET, "downloading data for all modules");
-			sub_storage::get_pairs(StorageKey(Default::default()), &client, at)
-				.await
-				.into_iter()
-				.map(|(k, v)| (k.0, v.0))
-				.collect::<Vec<_>>()
+			wait!(sub_storage::get_pairs(
+				StorageKey(Default::default()),
+				&client,
+				at
+			))
+			.into_iter()
+			.map(|(k, v)| (k.0, v.0))
+			.collect::<Vec<_>>()
 		};
 
 		// inject all the scraped keys and values.
@@ -148,12 +181,6 @@ mod tests_dummy {
 	use sp_runtime::traits::{BlakeTwo256, IdentityLookup};
 
 	type Header = sp_runtime::generic::Header<u32, BlakeTwo256>;
-
-	macro_rules! wait {
-		($e:expr) => {
-			tokio_test::block_on($e)
-		};
-	}
 
 	macro_rules! init_log {
 		() => {
@@ -207,14 +234,18 @@ mod tests_dummy {
 			hex!["f9a4ce984129569f63edc01b1c13374779f9384f1befd39931ffdcc83acf63a7"].into();
 		let parent: Hash =
 			hex!["540922e96a8fcaf945ed23c6f09c3e189bd88504ec945cc2171deaebeaf2f37e"].into();
-		wait!(Builder::new().at(hash).module("System").build()).execute_with(|| {
-			assert_eq!(
-				// note: the hash corresponds to 3098546. We can check only the parent.
-				// https://polkascan.io/kusama/block/3098546
-				<frame_system::Module<Runtime>>::block_hash(3098545u32),
-				parent,
-			)
-		});
+		Builder::new()
+			.at(hash)
+			.module("System")
+			.build()
+			.execute_with(|| {
+				assert_eq!(
+					// note: the hash corresponds to 3098546. We can check only the parent.
+					// https://polkascan.io/kusama/block/3098546
+					<frame_system::Module<Runtime>>::block_hash(3098545u32),
+					parent,
+				)
+			});
 	}
 
 	#[test]
@@ -222,7 +253,10 @@ mod tests_dummy {
 		init_log!();
 		let hash: Hash =
 			hex!["f9a4ce984129569f63edc01b1c13374779f9384f1befd39931ffdcc83acf63a7"].into();
-		wait!(Builder::new().at(hash).module("Staking").build())
+		Builder::new()
+			.at(hash)
+			.module("Staking")
+			.build()
 			.execute_with(|| assert_eq!(<pallet_staking::Module<Runtime>>::validator_count(), 400));
 	}
 }
