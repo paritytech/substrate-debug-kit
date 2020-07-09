@@ -2,11 +2,10 @@
 
 An equivalent of `TestExternalities` that can load its state from a remote substrate based chain.
 
-- For now, the `build()` method os not async and will block. This is so that the test code would be
+- For now, the `build()` method is not async and will block. This is so that the test code would be
   freed from dealing with an executor or async tests.
-- You typically have two options, either use a mock runtime file. In this case, you only care about
-  the types that you want to query and they must be the same as the one used in chain. Or, simply
-  use the runtime struct of the chain that you want to scrape.
+- You typically have two options, either use a mock runtime or a real one. In the case of a mock, you only care about
+  the types that you want to query and **they must be the same as the one used in chain**.
 
 
 ### Example
@@ -26,7 +25,8 @@ impl_outer_origin! {
 
 impl frame_system::Trait for TestRuntime {
 	..
-	// we only care about these two for now. The rest can be mock.
+	// we only care about these two for now. The rest can be mock. The block number type of 
+	// kusama is u32.
 	type BlockNumber = u32;
 	type Header = Header;
 	..
