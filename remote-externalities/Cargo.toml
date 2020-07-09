@@ -4,6 +4,25 @@ version = "0.1.0"
 authors = ["kianenigma <kian.peymani@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+async-std = { version = "1.2.0", features = ["attributes"] }
+jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee/", rev = "a0bea41c4f37125fa742ec48b12e11cf55c592b5", features = ["ws"] }
+separator = "0.4.1"
+ansi_term = "0.12.1"
+env_logger = "0.7.1"
+log = "0.4.8"
+
+sub-storage = { path = "../sub-storage" }
+sp-io = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+sp-core = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+
+[dev-dependencies]
+hex-literal = "0.2.1"
+tokio-test = "0.2.1"
+frame-system = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+frame-support = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+pallet-staking = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+kusama-runtime = { git = "https://github.com/paritytech/polkadot/", branch = "offline-phragmen-v0.8.11"}
+
+

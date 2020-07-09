@@ -3381,6 +3381,24 @@ checksum = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
 [[package]]
 name = "remote-externalities"
 version = "0.1.0"
+dependencies = [
+ "ansi_term 0.12.1",
+ "async-std",
+ "env_logger",
+ "frame-support",
+ "frame-system",
+ "hex-literal",
+ "jsonrpsee",
+ "kusama-runtime",
+ "log 0.4.8",
+ "pallet-staking",
+ "separator",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sub-storage",
+ "tokio-test",
+]
 
 [[package]]
 name = "remove_dir_all"
@@ -4712,6 +4730,17 @@ dependencies = [
  "mio",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "tokio-test"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed0049c119b6d505c4447f5c64873636c7af6c75ab0d45fd9f618d82acb8016d"
+dependencies = [
+ "bytes 0.5.5",
+ "futures-core",
+ "tokio",
 ]
 
 [[package]]
