@@ -20,6 +20,6 @@ A collection of debug tools and libraries around substrate chains.
   module's info and run election algorithms of `sp-npos-elections` offline. **Given the correct
   parameters**, it can be used to predict the next validator set. It also provide other election
   related functionalities. See the sub-commands for more info.
-- **`remote-externalities`**: [WIP] It provides the ability to write simple rust unit tests over a
+- **`remote-externalities`**: It provides the ability to write simple rust unit tests over a
   specific state of a chain. It can be very useful to debug breaking changes and storage migrations.
 - **`laboratory`**: This is where I try new stuff.
