@@ -75,7 +75,7 @@ impl fmt::Display for Currency {
 
 /// A wrapper type for account id that can be parsed from the command line.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ParsedAccountId(AccountId);
+pub struct ParsedAccountId(sp_core::crypto::AccountId32);
 
 impl std::str::FromStr for ParsedAccountId {
 	type Err = &'static str;
@@ -83,7 +83,7 @@ impl std::str::FromStr for ParsedAccountId {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		use sp_core::crypto::Ss58Codec;
 		// TODO: finish this: accept also hex string if this fails.
-		<AccountId as Ss58Codec>::from_ss58check(s)
+		<sp_core::crypto::AccountId32 as Ss58Codec>::from_ss58check(s)
 			.map_err(|_| "invalid ss58 address")
 			.map(|acc| Self(acc))
 	}

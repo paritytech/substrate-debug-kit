@@ -25,7 +25,6 @@ pub struct Opt {
 	uri: String,
 }
 
-
 #[async_std::main]
 async fn main() {
 	let opt = Opt::from_args();
@@ -41,6 +40,8 @@ async fn main() {
 	// dust(client).await
 	// coinbase(client).await
 }
+
+async fn max_score_submission(at: Hash, client: &Client) {}
 
 /// Checks the account balance before and after the given block hash. Good for testing slash/reward.
 async fn account_balance_around_block(account: &AccountId, at: Hash, client: &Client) {

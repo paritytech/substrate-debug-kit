@@ -387,7 +387,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		println!(
 			"#{} --> {} [{:?}] [total backing = {:?} ({} voters)] [own backing = {:?}]",
 			i + 1,
-			storage::helpers::get_identity(&s, &client, at).await,
+			storage::helpers::get_identity(s.as_ref(), &client, at).await,
 			s,
 			Currency(support.total),
 			other_count,

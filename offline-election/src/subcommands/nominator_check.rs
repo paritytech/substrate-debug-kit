@@ -38,7 +38,7 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 	println!("📅 Submitted in era {}", nomination.submitted_in);
 	println!("📣 Votes:");
 	for t in nomination.targets.iter() {
-		let ident = helpers::get_identity(t, client, at).await;
+		let ident = helpers::get_identity(t.as_ref(), client, at).await;
 		if let Some(active) = active_edges.iter().find(|e| e.0 == *t) {
 			let val = crate::Currency(active.1);
 			let index = active.2;

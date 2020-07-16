@@ -1,15 +1,12 @@
 use assert_cmd::Command;
 
-#[test]
-fn kusama_works() {
-	let mut cmd = Command::cargo_bin("sub-du").unwrap();
-	cmd.args(&["--uri", "wss://kusama-rpc.polkadot.io/", "-p"])
-		.unwrap();
-}
+#[cfg(feature = "remote-test")]
+const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
+#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
+const TEST_URI: &'static str = "ws://localhost:9944";
 
 #[test]
-fn polkadot_works() {
+fn sub_du_works() {
 	let mut cmd = Command::cargo_bin("sub-du").unwrap();
-	cmd.args(&["--uri", "wss://rpc.polkadot.io/", "-p"])
-		.unwrap();
+	cmd.args(&["--uri", TEST_URI, "-p"]).unwrap();
 }

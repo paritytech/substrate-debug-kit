@@ -63,7 +63,7 @@ pub async fn get_validators_and_expo_at(
 	Vec<(AccountId, pallet_staking::Exposure<AccountId, Balance>)>,
 ) {
 	use frame_support::Twox64Concat;
-	let validators = sub_storage::read::<Vec<node_primitives::AccountId>>(
+	let validators = sub_storage::read::<Vec<crate::primitives::AccountId>>(
 		sub_storage::value_key(b"Session", b"Validators"),
 		&client,
 		at,

@@ -13,7 +13,7 @@ pub async fn run(client: &Client, config: Opt) {
 		println!(
 			"#{} [{}] [total: {:?} / others: {:?} / count: {}]- {:?}",
 			i + 1,
-			get_identity(&v, client, at).await,
+			get_identity(v.as_ref(), client, at).await,
 			Currency(expo.total),
 			Currency(expo.others.iter().map(|indie| indie.value).sum::<Balance>()),
 			expo.others.len(),

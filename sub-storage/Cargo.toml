@@ -6,26 +6,25 @@ edition = "2018"
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "1.3.0", default-features = false, features = ["derive"] }
-jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee/", rev = "a0bea41c4f37125fa742ec48b12e11cf55c592b5", features = ["ws"] }
+jsonrpsee = { version = "0.1.0", features = ["ws"] }
 
 node-primitives = { package = "polkadot-primitives", git = "https://github.com/paritytech/polkadot", branch = "offline-phragmen-v0.8.11" }
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3", features = ["std", "full_crypto"] }
-frame-support = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
-frame-system = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
-sp-version = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
-frame-metadata = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+sp-core = "2.0.0-rc4"
+frame-support = "2.0.0-rc4"
+frame-system = "2.0.0-rc4"
+sp-version = "2.0.0-rc4"
+frame-metadata = "11.0.0-rc4"
 
 # Optional for helpers only.
-pallet-identity = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3", optional = true }
-pallet-balances = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3", optional = true }
+pallet-identity = { version = "2.0.0-rc4", optional = true }
+pallet-balances = { version = "2.0.0-rc4", optional = true }
 ansi_term = { version = "0.12.1", optional = true }
 
-
 [dev-dependencies]
-async-std = "1.2.0"
+async-std = { version = "1.5.0" }
 hex-literal = "0.2.1"
-frame-system = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
-pallet-balances = { git = "https://github.com/paritytech/substrate", rev = "31c3e06ded197bdf28130ac0c5310283b2d1b5b3" }
+frame-system = "2.0.0-rc4"
+pallet-balances = "2.0.0-rc4"
 
 [features]
 default = []

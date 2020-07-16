@@ -24,7 +24,7 @@ pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
 }
 
 /// Get the identity of an account.
-pub async fn get_identity(who: &AccountId, client: &Client, at: Hash) -> String {
+pub async fn get_identity(who: &[u8], client: &Client, at: Hash) -> String {
 	use pallet_identity::{Data, Registration};
 
 	let maybe_subidentity = crate::read::<(AccountId, Data)>(

@@ -9,9 +9,9 @@
 
 use log::*;
 use sp_core::hashing::twox_128;
-use sp_core::storage::StorageKey;
 use sp_io::TestExternalities;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
+use sub_storage::StorageKey;
 
 type Hash = sp_core::H256;
 
@@ -104,6 +104,68 @@ impl Builder {
 		self
 	}
 
+	pub fn build_into(self, ext: &mut TestExternalities) {
+		let uri = self.uri.unwrap_or(String::from("ws://localhost:9944"));
+
+		let transport = wait!(jsonrpsee::transport::ws::WsTransportClient::new(&uri))
+			.expect("Failed to connect to client");
+		let client: jsonrpsee::Client = jsonrpsee::raw::RawClient::new(transport).into();
+
+		let head = wait!(sub_storage::get_head(&client));
+		let at = self.at.unwrap_or(head);
+
+		info!(target: LOG_TARGET, "connecting to node {} at {:?}", uri, at);
+
+		let keys_and_values = if self.module_filter.len() > 0 {
+			let mut filtered_kv = vec![];
+			for f in self.module_filter {
+				let hashed_prefix = twox_128(f.as_bytes());
+				debug!(
+					target: LOG_TARGET,
+					"Downloading data for module {} (prefix: {:?}).",
+					f,
+					hashed_prefix.hex_display()
+				);
+				let module_kv = wait!(sub_storage::get_pairs(
+					StorageKey(hashed_prefix.to_vec()),
+					&client,
+					at
+				));
+
+				for kv in module_kv.into_iter().map(|(k, v)| (k.0, v.0)) {
+					filtered_kv.push(kv);
+				}
+			}
+			filtered_kv
+		} else {
+			debug!(target: LOG_TARGET, "Downloading data for all modules.");
+			wait!(sub_storage::get_pairs(
+				StorageKey(Default::default()),
+				&client,
+				at
+			))
+			.into_iter()
+			.map(|(k, v)| (k.0, v.0))
+			.collect::<Vec<_>>()
+		};
+
+		// inject all the scraped keys and values.
+		for (k, v) in keys_and_values {
+			trace!(
+				target: LOG_TARGET,
+				"injecting {:?} -> {:?}",
+				k.hex_display(),
+				v.hex_display()
+			);
+			ext.insert(k, v);
+		}
+
+		// lastly, insert the injections, if any.
+		for (k, v) in self.inject.into_iter() {
+			ext.insert(k, v);
+		}
+	}
+
 	/// Build the test externalities.
 	pub fn build(self) -> TestExternalities {
 		let mut ext = TestExternalities::new_empty();
@@ -124,7 +186,7 @@ impl Builder {
 				let hashed_prefix = twox_128(f.as_bytes());
 				debug!(
 					target: LOG_TARGET,
-					"downloading data for module {} -> {:?}",
+					"Downloading data for module {} (prefix: {:?}).",
 					f,
 					hashed_prefix.hex_display()
 				);
@@ -140,7 +202,7 @@ impl Builder {
 			}
 			filtered_kv
 		} else {
-			debug!(target: LOG_TARGET, "downloading data for all modules");
+			debug!(target: LOG_TARGET, "Downloading data for all modules.");
 			wait!(sub_storage::get_pairs(
 				StorageKey(Default::default()),
 				&client,
@@ -176,11 +238,15 @@ mod tests_dummy {
 	use super::*;
 	use frame_support::impl_outer_origin;
 	use hex_literal::hex;
-	use kusama_runtime::Runtime;
 	use sp_core::H256;
 	use sp_runtime::traits::{BlakeTwo256, IdentityLookup};
 
 	type Header = sp_runtime::generic::Header<u32, BlakeTwo256>;
+
+	#[cfg(feature = "remote-test")]
+	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
+	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
+	const TEST_URI: &'static str = "ws://localhost:9944";
 
 	macro_rules! init_log {
 		() => {
@@ -235,28 +301,33 @@ mod tests_dummy {
 		let parent: Hash =
 			hex!["540922e96a8fcaf945ed23c6f09c3e189bd88504ec945cc2171deaebeaf2f37e"].into();
 		Builder::new()
+			.uri(TEST_URI.into())
 			.at(hash)
-			.module("System")
+			.module("Staking")
 			.build()
 			.execute_with(|| {
 				assert_eq!(
 					// note: the hash corresponds to 3098546. We can check only the parent.
 					// https://polkascan.io/kusama/block/3098546
-					<frame_system::Module<Runtime>>::block_hash(3098545u32),
+					<frame_system::Module<TestRuntime>>::block_hash(3098545u32),
 					parent,
 				)
 			});
 	}
 
-	#[test]
-	fn kusama_runtime_works() {
-		init_log!();
-		let hash: Hash =
-			hex!["f9a4ce984129569f63edc01b1c13374779f9384f1befd39931ffdcc83acf63a7"].into();
-		Builder::new()
-			.at(hash)
-			.module("Staking")
-			.build()
-			.execute_with(|| assert_eq!(<pallet_staking::Module<Runtime>>::validator_count(), 400));
-	}
+	// This is an example of how this would work with a real runtime.
+	// Note that in this case the version of `pallet_staking` need to be the same as the one used by
+	// your runtime, and the same as the sp-io used by this crate.
+	// #[test]
+	// fn kusama_runtime_works() {
+	// 	use kusama_runtime::Runtime;
+	// 	init_log!();
+	// 	let hash: Hash =
+	// 		hex!["f9a4ce984129569f63edc01b1c13374779f9384f1befd39931ffdcc83acf63a7"].into();
+	// 	Builder::new()
+	// 		.at(hash)
+	// 		.module("Staking")
+	// 		.build()
+	// 		.execute_with(|| assert_eq!(<pallet_staking::Module<Runtime>>::validator_count(), 400));
+	// }
 }

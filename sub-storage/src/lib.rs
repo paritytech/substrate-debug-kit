@@ -233,8 +233,10 @@ mod tests {
 	use node_primitives::{Balance, Nonce};
 	use pallet_balances::AccountData;
 
+	#[cfg(feature = "remote-test")]
 	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
-	// const TEST_URI: &'static str = "ws://localhost:9944";
+	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
+	const TEST_URI: &'static str = "ws://localhost:9944";
 
 	async fn build_client() -> Client {
 		let transport = WsTransportClient::new(TEST_URI)
