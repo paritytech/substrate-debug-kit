@@ -49,33 +49,36 @@ async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>
 	.await
 	.expect("Staking::nominators should be enumerable");
 
-	nominators
-		.into_iter()
-		.enumerate()
-		.map(|(idx, (who, n))| {
-			// retain only targets who have not been yet slashed recently. This is highly dependent
-			// on the staking implementation.
-			let submitted_in = n.submitted_in;
-			let initial_len = n.targets.len();
-			let mut targets = n.targets;
-			targets.retain(|target| {
-				let maybe_slashing_spans =
-					async_std::task::block_on(slashing_span_of(&target, client, at));
-				maybe_slashing_spans
-					.map_or(true, |spans| submitted_in >= spans.last_nonzero_slash())
-			});
-			log::trace!(
-				target: LOG_TARGET,
-				"[{}] retaining {}/{} nominations for {:?}",
-				idx,
-				targets.len(),
-				initial_len,
-				who,
-			);
+	let mut result = vec![];
+	for (idx, (who, n)) in nominators.into_iter().enumerate() {
+		// retain only targets who have not been yet slashed recently. This is highly dependent
+		// on the staking implementation.
+		let submitted_in = n.submitted_in;
+		let targets = n.targets;
+		let mut filtered_targets = vec![];
+		// TODO: move back to closures and retain, but async-std::block_on can't work well here for
+		// whatever reason. Or move to streams?
+		for target in targets.iter() {
+			let maybe_slashing_spans = slashing_span_of(&target, client, at).await;
+			if maybe_slashing_spans.map_or(true, |spans| submitted_in >= spans.last_nonzero_slash())
+			{
+				filtered_targets.push(target.clone());
+			}
+		}
 
-			(who, targets)
-		})
-		.collect::<Vec<(AccountId, Vec<AccountId>)>>()
+		log::trace!(
+			target: LOG_TARGET,
+			"[{}] retaining {}/{} nominations for {:?}",
+			idx,
+			filtered_targets.len(),
+			targets.len(),
+			who,
+		);
+
+		result.push((who, targets));
+	}
+
+	result
 }
 
 async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> Staker {
@@ -387,7 +390,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		println!(
 			"#{} --> {} [{:?}] [total backing = {:?} ({} voters)] [own backing = {:?}]",
 			i + 1,
-			storage::helpers::get_identity(s.as_ref(), &client, at).await,
+			storage::helpers::get_identity::<AccountId, Balance>(s.as_ref(), &client, at).await,
 			s,
 			Currency(support.total),
 			other_count,

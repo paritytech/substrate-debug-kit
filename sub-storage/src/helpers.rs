@@ -1,14 +1,16 @@
 //! Some helper functions for common substrate chains.
 
+use crate::Hash;
 use ansi_term::Colour;
+use codec::{Decode, Encode};
 use frame_support::{Blake2_128Concat, Twox64Concat};
 use frame_system::AccountInfo;
 use jsonrpsee::Client;
-use node_primitives::{AccountId, Balance, Hash, Nonce};
 use pallet_balances::AccountData;
+use std::fmt::Debug;
 
 /// Get the nick of a given account id.
-pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
+pub async fn get_nick<Balance: Decode>(who: &[u8], client: &Client, at: Hash) -> String {
 	let nick = crate::read::<(Vec<u8>, Balance)>(
 		crate::map_key::<Twox64Concat>(b"Nicks", b"NameOf", who.as_ref()),
 		client,
@@ -24,7 +26,14 @@ pub async fn get_nick(who: &AccountId, client: &Client, at: Hash) -> String {
 }
 
 /// Get the identity of an account.
-pub async fn get_identity(who: &[u8], client: &Client, at: Hash) -> String {
+pub async fn get_identity<
+	AccountId: Decode + AsRef<[u8]>,
+	Balance: Encode + Decode + Copy + Clone + Debug + Eq + PartialEq,
+>(
+	who: &[u8],
+	client: &Client,
+	at: Hash,
+) -> String {
 	use pallet_identity::{Data, Registration};
 
 	let maybe_subidentity = crate::read::<(AccountId, Data)>(
@@ -78,8 +87,8 @@ pub async fn get_identity(who: &[u8], client: &Client, at: Hash) -> String {
 }
 
 /// Get the account data at the given block.
-pub async fn get_account_data_at(
-	account: &AccountId,
+pub async fn get_account_data_at<Balance: Decode, Nonce: Decode>(
+	account: &[u8],
 	client: &Client,
 	at: Hash,
 ) -> AccountInfo<Nonce, AccountData<Balance>> {

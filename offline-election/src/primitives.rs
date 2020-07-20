@@ -10,4 +10,5 @@ pub type Balance = u128;
 pub type Hash = sp_core::hash::H256;
 /// The block number type
 pub type BlockNumber = u32;
+/// Re-exported hashing types.
 pub use sp_core::hashing::{blake2_256, twox_128};

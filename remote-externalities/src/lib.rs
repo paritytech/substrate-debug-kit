@@ -243,8 +243,10 @@ mod tests_dummy {
 
 	type Header = sp_runtime::generic::Header<u32, BlakeTwo256>;
 
-	#[cfg(feature = "remote-test")]
+	#[cfg(feature = "remote-test-kusama")]
 	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
+	#[cfg(feature = "remote-test-polkadot")]
+	const TEST_URI: &'static str = "wss://rpc.polkadot.io/";
 	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
 	const TEST_URI: &'static str = "ws://localhost:9944";
 
@@ -291,6 +293,7 @@ mod tests_dummy {
 		type AccountData = ();
 		type OnNewAccount = ();
 		type OnKilledAccount = ();
+		type SystemWeightInfo = ();
 	}
 
 	#[test]

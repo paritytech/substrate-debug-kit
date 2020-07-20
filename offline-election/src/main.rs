@@ -24,7 +24,6 @@ pub use primitives::{AccountId, Balance, BlockNumber, Hash};
 
 use atomic_refcell::AtomicRefCell as RefCell;
 use jsonrpsee::Client;
-pub use sc_rpc_api::state::StateClient;
 use separator::Separatable;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 use std::path::PathBuf;
@@ -74,6 +73,7 @@ impl fmt::Display for Currency {
 }
 
 /// A wrapper type for account id that can be parsed from the command line.
+// TODO: this is no longer needed: https://github.com/paritytech/substrate/pull/6621
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ParsedAccountId(sp_core::crypto::AccountId32);
 

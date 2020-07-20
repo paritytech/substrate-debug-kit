@@ -12,7 +12,6 @@ use jsonrpsee::{
 	common::{to_value as to_json_value, Params},
 	Client,
 };
-use node_primitives::Hash;
 use sp_core::hashing::twox_128;
 use std::fmt::Debug;
 
@@ -20,10 +19,10 @@ use std::fmt::Debug;
 #[cfg(feature = "helpers")]
 pub mod helpers;
 
-// re-export all the primitives.
-pub use node_primitives as primitives;
-// re-export some stuff from sp-core.
+/// re-export some stuff from sp-core.
 pub use sp_core::storage::{StorageData, StorageKey};
+/// The hash type used by this crate.
+pub type Hash = sp_core::hash::H256;
 
 /// create key for a simple value.
 pub fn value_key(module: &[u8], storage: &[u8]) -> StorageKey {
@@ -227,14 +226,18 @@ pub async fn get_storage_size(key: StorageKey, client: &Client, at: Hash) -> Opt
 mod tests {
 	use super::*;
 	use async_std::task::block_on;
-	use jsonrpsee::{raw::RawClient, transport::ws::WsTransportClient, Client};
-
 	use frame_system::AccountInfo;
-	use node_primitives::{Balance, Nonce};
+	use jsonrpsee::{raw::RawClient, transport::ws::WsTransportClient, Client};
 	use pallet_balances::AccountData;
 
-	#[cfg(feature = "remote-test")]
+	// These must be the same as node-primitives
+	type Balance = u128;
+	type Nonce = u32;
+
+	#[cfg(feature = "remote-test-kusama")]
 	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
+	#[cfg(feature = "remote-test-polkadot")]
+	const TEST_URI: &'static str = "wss://rpc.polkadot.io/";
 	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
 	const TEST_URI: &'static str = "ws://localhost:9944";
 

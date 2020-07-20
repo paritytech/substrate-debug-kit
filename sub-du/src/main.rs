@@ -4,8 +4,8 @@ use separator::Separatable;
 use structopt::StructOpt;
 use sub_storage::get_head;
 use sub_storage::get_metadata;
-use sub_storage::primitives;
 use sub_storage::unwrap_decoded;
+use sub_storage::Hash;
 use sub_storage::StorageKey;
 
 const KB: usize = 1024;
@@ -137,7 +137,7 @@ struct Opt {
 	/// The block number at which the scrap should happen. Use only the hex value, no need for a
 	/// `0x` prefix.
 	#[structopt(long)]
-	at: Option<primitives::Hash>,
+	at: Option<Hash>,
 
 	/// The node to connect to.
 	#[structopt(long, default_value = "ws://localhost:9944")]
