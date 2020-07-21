@@ -341,10 +341,20 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		let improved_score = evaluate_support(&supports);
 		log::info!(
 			target: LOG_TARGET,
-			"Equalized the results for [{}/{}] iterations, improved slot stake by {:?}",
+			"Balanced the results for [{}/{}] iterations, improved slot stake by {:?}",
 			done,
 			iterations,
-			Currency(improved_score[0] - initial_score[0]),
+			Currency(
+				improved_score[0]
+					.checked_sub(initial_score[0])
+					.unwrap_or_else(|| {
+						log::error!(
+							target: LOG_TARGET,
+							"Balancing has returned a set which has a lower slot stake. This is most likely a serious bug.",
+						);
+						0
+					})
+			),
 		);
 		initial_score = improved_score;
 	}
