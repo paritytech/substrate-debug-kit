@@ -8,6 +8,7 @@ const TEST_URI: &'static str = "wss://rpc.polkadot.io/";
 const TEST_URI: &'static str = "ws://localhost:9944";
 
 #[test]
+#[ignore = "ignore until https://github.com/paritytech/substrate/pull/6693 is merged"]
 fn staking_works() {
 	let mut cmd = Command::cargo_bin("offline-election").unwrap();
 	cmd.args(&["--uri", TEST_URI, "staking"]).unwrap();
@@ -29,13 +30,28 @@ fn dangling_works() {
 #[test]
 fn nominator_check_works() {
 	let mut cmd = Command::cargo_bin("offline-election").unwrap();
+	let transport =
+		async_std::task::block_on(jsonrpsee::transport::ws::WsTransportClient::new(TEST_URI))
+			.expect("Failed to connect to client");
+	let client: jsonrpsee::Client = jsonrpsee::raw::RawClient::new(transport).into();
+
+	// get the latest block hash
+	let head = async_std::task::block_on(sub_storage::get_head(&client));
+	let version = async_std::task::block_on(sub_storage::get_runtime_version(&client, head));
+
 	// some totally random account.
 	cmd.args(&[
 		"--uri",
 		TEST_URI,
 		"nominator-check",
 		"--who",
-		"Hph4pHAqDVVdc3vLani7DfQA2TU3FfuuUcBQC8tYbWgBTnC",
+		if version.spec_name == "kusama".into() {
+			"Hph4pHAqDVVdc3vLani7DfQA2TU3FfuuUcBQC8tYbWgBTnC"
+		} else if version.spec_name == "polkadot".into() {
+			"13Vka4qGSStrNoFZap9qryQCbubfjDVyeradJwU2BG7TxZir"
+		} else {
+			panic!("unsupported chain.")
+		},
 	])
 	.unwrap();
 }
