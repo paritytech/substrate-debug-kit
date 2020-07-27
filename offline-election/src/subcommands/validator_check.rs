@@ -64,4 +64,5 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 	}
 	println!("🤑 Total stake = {:?}", Currency(exposure.total));
 	println!("\n⌗ Raw Exposure = {:?}", exposure);
+	println!("⌗ Raw Slashing spans = {:?}", maybe_slashing_spans);
 }
