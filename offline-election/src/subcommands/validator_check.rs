@@ -1,4 +1,4 @@
-use crate::{primitives::AccountId, Client, Opt};
+use crate::{primitives::AccountId, subcommands, Client, Currency, Opt};
 use pallet_staking::Nominations;
 
 /// Main run function of the sub-command.
@@ -26,8 +26,8 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 		})
 		.collect::<Vec<_>>();
 
-	let era = crate::subcommands::staking::get_current_era(client, at).await;
-	let exposure = crate::subcommands::staking::exposure_of(&who, era, client, at).await;
+	let era = subcommands::staking::get_current_era(client, at).await;
+	let exposure = subcommands::staking::exposure_of(&who, era, client, at).await;
 
 	for (n, submitted_in) in my_nominators {
 		let is_exposed = exposure
@@ -36,17 +36,32 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 			.find(|ie| ie.who == n)
 			.map(|ie| ie.value);
 		let is_dangling =
-			crate::subcommands::dangling_nominators::is_dangling(&n, submitted_in, client, at)
-				.await;
+			subcommands::dangling_nominators::is_dangling(&n, submitted_in, client, at).await;
 		println!(
-			"Voted from [{:?}] || dangling: {} || exposed: {}",
+			"\t Voted from [{:?}] || dangling: {} || exposed: {}",
 			n,
-			if is_dangling { "❌ Yes" } else { "✅ No" },
+			if is_dangling {
+				format!("❌ Yes, submitted in era {}", submitted_in)
+			} else {
+				"✅ No".into()
+			},
 			if let Some(val) = is_exposed {
-				format!("💰 by {:?}", crate::Currency(val))
+				format!("💰 by {:?}", Currency(val))
 			} else {
 				"∅".into()
 			},
 		)
 	}
+
+	let maybe_slashing_spans = subcommands::staking::slashing_span_of(&who, client, at).await;
+	if let Some(spans) = maybe_slashing_spans {
+		println!(
+			"⚠️  Last non-zero slash happened at {}",
+			spans.last_nonzero_slash()
+		);
+	} else {
+		println!("✅ This validator has no slashing spans.");
+	}
+	println!("🤑 Total stake = {:?}", Currency(exposure.total));
+	println!("\n⌗ Raw Exposure = {:?}", exposure);
 }
