@@ -8,7 +8,6 @@ const TEST_URI: &'static str = "wss://rpc.polkadot.io/";
 const TEST_URI: &'static str = "ws://localhost:9944";
 
 #[test]
-#[ignore = "ignore until https://github.com/paritytech/substrate/pull/6693 is merged"]
 fn staking_works() {
 	let mut cmd = Command::cargo_bin("offline-election").unwrap();
 	cmd.args(&["--uri", TEST_URI, "staking"]).unwrap();

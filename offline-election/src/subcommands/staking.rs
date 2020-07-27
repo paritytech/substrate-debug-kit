@@ -26,7 +26,8 @@ fn assert_supports_total_equal(s1: &SupportMap<AccountId>, s2: &SupportMap<Accou
 	assert!(s1.iter().all(|(v, s)| s2.get(v).unwrap().total == s.total))
 }
 
-async fn get_current_era(client: &Client, at: Hash) -> EraIndex {
+/// Get the current era.
+pub async fn get_current_era(client: &Client, at: Hash) -> EraIndex {
 	storage::read::<EraIndex>(storage::value_key(MODULE, b"CurrentEra"), client, at)
 		.await
 		.expect("CurrentEra must exist")
@@ -118,7 +119,8 @@ pub async fn slashing_span_of(
 	.await
 }
 
-async fn exposure_of(
+/// Get the exposure of `stash` at `era`.
+pub async fn exposure_of(
 	stash: &AccountId,
 	era: EraIndex,
 	client: &Client,

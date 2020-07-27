@@ -15,10 +15,19 @@ log = "0.4.8"
 structopt = { version = "0.3" }
 
 sub-storage = { path = "../sub-storage", features = ["helpers"] }
-frame-metadata = { version = "11.0.0-rc4" }
+frame-metadata = { version = "11.0.0-rc5" }
 
 [dev-dependencies]
 assert_cmd = "1.0.1"
+
+
+
+
+
+
+
+
+
 
 
 

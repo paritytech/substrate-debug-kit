@@ -110,8 +110,11 @@ pub struct Opt {
 	/// Network address format. Can be kusama|polkadot|substrate.
 	///
 	/// This will also change the token display name.
-	#[structopt(short, long, default_value = "polkadot")]
-	network: String,
+	///
+	/// If not provided, then the spec name of the runtime version at given at will be compared to
+	/// be `polkadot`, `kusama` or `substrate`.
+	#[structopt(short, long)]
+	network: Option<String>,
 
 	/// Print more output.
 	#[structopt(short, parse(from_occurrences))]
@@ -206,19 +209,6 @@ async fn main() -> () {
 
 	let mut opt = Opt::from_args();
 
-	let address_format = match &opt.network[..] {
-		"polkadot" => Ss58AddressFormat::PolkadotAccount,
-		"kusama" => Ss58AddressFormat::KusamaAccount,
-		"substrate" => Ss58AddressFormat::SubstrateAccount,
-		_ => panic!("Invalid network/address format."),
-	};
-
-	// setup address format and currency based on address format.
-	set_default_ss58_version(address_format);
-	if address_format.eq(&Ss58AddressFormat::PolkadotAccount) {
-		*TOKEN_NAME.borrow_mut() = "DOT";
-	}
-
 	// connect to a node.
 	let transport = jsonrpsee::transport::ws::WsTransportClient::new(&opt.uri)
 		.await
@@ -231,6 +221,22 @@ async fn main() -> () {
 	// potentially replace head with the given hash
 	let at = opt.at.unwrap_or(head);
 	opt.at = Some(at);
+
+	let runtime_version = sub_storage::get_runtime_version(&client, at).await;
+	let spec_name = runtime_version.spec_name;
+	let network_address = opt.clone().network.unwrap_or_else(|| spec_name.into());
+	let address_format = match &network_address[..] {
+		"polkadot" => Ss58AddressFormat::PolkadotAccount,
+		"kusama" => Ss58AddressFormat::KusamaAccount,
+		"substrate" => Ss58AddressFormat::SubstrateAccount,
+		_ => panic!("Invalid network/address format."),
+	};
+
+	// setup address format and currency based on address format.
+	set_default_ss58_version(address_format);
+	if address_format.eq(&Ss58AddressFormat::PolkadotAccount) {
+		*TOKEN_NAME.borrow_mut() = "DOT";
+	}
 
 	// set total issuance
 	network::issuance::set(&client, at).await;
@@ -256,6 +262,8 @@ async fn main() -> () {
 		SubCommands::NominatorCheck { who } => {
 			subcommands::nominator_check::run(&client, opt.clone(), who.0).await
 		}
-		SubCommands::ValidatorCheck { .. } => unimplemented!(),
+		SubCommands::ValidatorCheck { who } => {
+			subcommands::validator_check::run(&client, opt.clone(), who.0).await
+		}
 	};
 }

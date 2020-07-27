@@ -8,3 +8,5 @@ pub mod elections_phragmen;
 pub mod nominator_check;
 /// Staking sub-command.
 pub mod staking;
+/// Validator-check sub-command.
+pub mod validator_check;

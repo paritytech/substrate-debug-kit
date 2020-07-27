@@ -263,7 +263,6 @@ mod tests_dummy {
 	#[derive(Clone, Eq, PartialEq, Debug, Default)]
 	pub struct TestRuntime;
 
-	use frame_system as system;
 	impl_outer_origin! {
 		pub enum Origin for TestRuntime {}
 	}
@@ -306,7 +305,7 @@ mod tests_dummy {
 		Builder::new()
 			.uri(TEST_URI.into())
 			.at(hash)
-			.module("Staking")
+			.module("System")
 			.build()
 			.execute_with(|| {
 				assert_eq!(

@@ -1,6 +1,18 @@
+use crate::primitives::Hash;
 use crate::subcommands::staking::slashing_span_of;
 use crate::{primitives::AccountId, storage, Client, Opt, LOG_TARGET};
 use pallet_staking::Nominations;
+
+/// Check if a vote submitted at the given era for this target is dangling or not.
+pub async fn is_dangling(
+	target: &AccountId,
+	submitted_in: pallet_staking::EraIndex,
+	client: &Client,
+	at: Hash,
+) -> bool {
+	let maybe_slashing_spans = slashing_span_of(&target, client, at).await;
+	!maybe_slashing_spans.map_or(true, |spans| submitted_in >= spans.last_nonzero_slash())
+}
 
 /// Main run function of the sub-command.
 pub async fn run(client: &Client, opt: Opt) {
@@ -27,9 +39,7 @@ pub async fn run(client: &Client, opt: Opt) {
 		// TODO: move back to closures and retain, but async-std::block_on can't work well here for
 		// whatever reason. Or move to streams?
 		for target in targets.iter() {
-			let maybe_slashing_spans = slashing_span_of(&target, client, at).await;
-			if maybe_slashing_spans.map_or(true, |spans| submitted_in >= spans.last_nonzero_slash())
-			{
+			if !is_dangling(target, submitted_in, client, at).await {
 				filtered_targets.push(target.clone());
 			}
 		}
