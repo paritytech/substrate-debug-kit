@@ -53,16 +53,16 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 		)
 	}
 
+	println!("🤑 Total stake = {:?}", Currency(exposure.total));
 	let maybe_slashing_spans = subcommands::staking::slashing_span_of(&who, client, at).await;
 	if let Some(spans) = maybe_slashing_spans {
 		println!(
 			"⚠️  Last non-zero slash happened at {}",
 			spans.last_nonzero_slash()
 		);
+		println!("💭 Raw Slashing spans = {:?}", spans);
 	} else {
 		println!("✅ This validator has no slashing spans.");
 	}
-	println!("🤑 Total stake = {:?}", Currency(exposure.total));
-	println!("\n⌗ Raw Exposure = {:?}", exposure);
-	println!("⌗ Raw Slashing spans = {:?}", maybe_slashing_spans);
+	println!("💭 Raw Exposure = {:?}", exposure);
 }
