@@ -73,7 +73,7 @@ function main(version) {
 		let cargo_file = path.join(d, "Cargo.toml")
 		let content = String(fs.readFileSync(cargo_file))
 		let new_content = do_update(content, version)
-		fs.writeFileSync(cargo_file, new_content)
+		fs.writeFileSync(cargo_file, new_content.trimRight())
 	}
 }
 

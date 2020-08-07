@@ -274,7 +274,22 @@ mod tests {
 
 	#[test]
 	fn get_storage_size_works_map() {
-		unimplemented!();
+		let client = block_on(build_client());
+		let at = block_on(get_head(&client));
+		let hash = map_prefix_key(b"Staking", b"Validators");
+		let size = block_on(get_storage_size(hash, &client, at)).unwrap();
+
+		assert!(size > 0);
+	}
+
+	#[test]
+	fn get_storage_size_works_value() {
+		let client = block_on(build_client());
+		let at = block_on(get_head(&client));
+		let hash = map_prefix_key(b"Staking", b"ValidatorCount");
+		let size = block_on(get_storage_size(hash, &client, at)).unwrap();
+
+		assert_eq!(size, 4);
 	}
 
 	#[test]

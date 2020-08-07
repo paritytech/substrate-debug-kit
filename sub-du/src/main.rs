@@ -12,14 +12,13 @@ const KB: usize = 1024;
 const MB: usize = KB * KB;
 const GB: usize = MB * MB;
 
-// TODO: print entire state size.
-
 pub const LOG_TARGET: &'static str = "sub-du";
 
 fn get_prefix(indent: usize) -> &'static str {
 	match indent {
 		1 => "├─┬",
-		2 => "│ │──",
+		2 => "│ │─┬",
+		3 => "│ │ │─",
 		_ => panic!("Unexpected indent."),
 	}
 }
@@ -29,11 +28,11 @@ struct Size(usize);
 impl std::fmt::Display for Size {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		if self.0 <= KB {
-			write!(f, "{: <3}B", self.0)?;
+			write!(f, "{: <4}B", self.0)?;
 		} else if self.0 <= MB {
-			write!(f, "{: <3}K", self.0 / KB)?;
+			write!(f, "{: <4}K", self.0 / KB)?;
 		} else if self.0 <= GB {
-			write!(f, "{: <3}M", self.0 / MB)?;
+			write!(f, "{: <4}M", self.0 / MB)?;
 		}
 
 		Ok(())
@@ -54,11 +53,11 @@ impl std::fmt::Display for Module {
 			f,
 			"{} {} {}\n",
 			mod_style.paint(format!("{}", Size(self.size))),
-			get_prefix(1),
+			get_prefix(2),
 			mod_style.paint(self.name.clone())
 		)?;
 		for s in self.items.iter() {
-			write!(f, "{} {} {}\n", Size(s.size), get_prefix(2), s)?;
+			write!(f, "{} {} {}\n", Size(s.size), get_prefix(3), s)?;
 		}
 		Ok(())
 	}
@@ -83,12 +82,9 @@ impl std::fmt::Display for StorageItem {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Value(bytes) => write!(f, "Value({} bytes)", bytes.separated_string()),
-			Self::Map(bytes, count) => write!(
-				f,
-				"Value({} bytes, {} keys)",
-				bytes.separated_string(),
-				count
-			),
+			Self::Map(bytes, count) => {
+				write!(f, "Map({} bytes, {} keys)", bytes.separated_string(), count)
+			}
 		}
 	}
 }
@@ -169,7 +165,15 @@ async fn main() -> () {
 	// potentially replace head with the given hash
 	let head = get_head(&client).await;
 	let at = opt.at.unwrap_or(head);
-	log::info!(target: LOG_TARGET, "Working at block {:?}", at);
+	let runtime = sub_storage::get_runtime_version(&client, at).await;
+
+	log::info!(
+		target: LOG_TARGET,
+		"Scraping at block {:?} of {}({})",
+		at,
+		runtime.spec_name,
+		runtime.spec_version,
+	);
 
 	let raw_metadata = get_metadata(&client, at).await.0;
 	let prefixed_metadata = <RuntimeMetadataPrefixed as codec::Decode>::decode(&mut &*raw_metadata)
@@ -249,6 +253,8 @@ async fn main() -> () {
 		modules.sort_by_key(|m| m.size);
 		modules.reverse();
 
+		let total: usize = modules.iter().map(|m| m.size).sum();
+		println!("{} {} {}", Size(total), get_prefix(1), runtime.spec_name,);
 		modules.into_iter().for_each(|m| {
 			print!("{}", m);
 		});

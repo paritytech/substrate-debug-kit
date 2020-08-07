@@ -527,8 +527,36 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	if let Some(output_file) = conf.output {
 		use std::fs::File;
 
+		// We can't really use u128 or arbitrary_precision of serde for now, so sadly all I can do
+		// is duplicate the types with u64. Not cool but okay for now.
+		#[derive(serde::Serialize, serde::Deserialize)]
+		struct Support64 {
+			total: u64,
+			voters: Vec<(AccountId, u64)>,
+		}
+
+		type SupportMap64 = std::collections::BTreeMap<AccountId, Support64>;
+
+		impl From<sp_npos_elections::Support<AccountId>> for Support64 {
+			fn from(t: sp_npos_elections::Support<AccountId>) -> Self {
+				Self {
+					total: t.total.try_into().unwrap(),
+					voters: t
+						.voters
+						.into_iter()
+						.map(|(w, v)| (w, (v).try_into().unwrap()))
+						.collect::<Vec<_>>(),
+				}
+			}
+		}
+
+		let mut supports_64 = SupportMap64::new();
+		for (k, v) in supports.into_iter() {
+			supports_64.insert(k, v.into());
+		}
+
 		let output = serde_json::json!({
-			"supports": supports,
+			"supports": supports_64,
 			"winners": elected_stashes,
 		});
 

@@ -60,7 +60,7 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 			"⚠️  Last non-zero slash happened at {}",
 			spans.last_nonzero_slash()
 		);
-		println!("💭 Raw Slashing spans = {:?}", spans);
+		println!("💭g Raw Slashing spans = {:?}", spans);
 	} else {
 		println!("✅ This validator has no slashing spans.");
 	}
