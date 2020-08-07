@@ -11,7 +11,7 @@ jsonrpsee = { version = "0.1.0", features = ["ws"] }
 separator = "0.4.1"
 ansi_term = "0.12.1"
 env_logger = "0.7.1"
-log = "0.4.8"
+log = "0.4.11"
 
 sub-storage = { path = "../sub-storage" }
 sp-io = { version = "2.0.0-rc5" }
@@ -19,10 +19,9 @@ sp-core = { version = "2.0.0-rc5" }
 sp-externalities = { version = "0.8.0-rc5" }
 
 [dev-dependencies]
-hex-literal = "0.2.1"
+hex-literal = "0.3.1"
 tokio-test = "0.2.1"
 frame-system = { version = "2.0.0-rc5" }
 frame-support = { version = "2.0.0-rc5" }
 pallet-staking = { version = "2.0.0-rc5" }
 sp-runtime = { version = "2.0.0-rc5" }
-
