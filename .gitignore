@@ -1,5 +1,4 @@
 target/
 log
 out
-*.json
 .vscode

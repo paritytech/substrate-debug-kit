@@ -13,6 +13,7 @@ use jsonrpsee::{
 	Client,
 };
 use sp_core::hashing::twox_128;
+use sp_runtime::traits::BlakeTwo256;
 use std::fmt::Debug;
 
 /// Helper's module.
@@ -23,6 +24,14 @@ pub mod helpers;
 pub use sp_core::storage::{StorageData, StorageKey};
 /// The hash type used by this crate.
 pub type Hash = sp_core::hash::H256;
+
+/// Create a client
+pub async fn create_ws_client(endpoint: &str) -> Client {
+	let transport = jsonrpsee::transport::ws::WsTransportClient::new(endpoint)
+		.await
+		.expect("Failed to connect to client");
+	jsonrpsee::raw::RawClient::new(transport).into()
+}
 
 /// create key for a simple value.
 pub fn value_key(module: &[u8], storage: &[u8]) -> StorageKey {
@@ -190,6 +199,22 @@ pub async fn get_head(client: &Client) -> Hash {
 	<Hash as Decode>::decode(&mut &*now_raw).expect("Block hash should decode")
 }
 
+/// Get the latest finalized head of the chain.
+///
+/// This is technically not a storage operation but RPC, but we will keep it here since it is very
+/// useful in lots of places.
+pub async fn get_header(
+	client: &Client,
+	at: Hash,
+) -> sp_runtime::generic::Header<u32, BlakeTwo256> {
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let data: Option<sp_runtime::generic::Header<u32, BlakeTwo256>> = client
+		.request("chain_getHeader", Params::Array(vec![at]))
+		.await
+		.expect("get chain header request failed");
+	data.unwrap()
+}
+
 /// Get the metadata of a chain.
 pub async fn get_metadata(client: &Client, at: Hash) -> sp_core::Bytes {
 	let at = to_json_value(at).expect("Block hash serialization infallible");
@@ -241,7 +266,7 @@ mod tests {
 	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
 	const TEST_URI: &'static str = "ws://localhost:9944";
 
-	async fn build_client() -> Client {
+	async fn test_client() -> Client {
 		let transport = WsTransportClient::new(TEST_URI)
 			.await
 			.expect("Failed to connect to client");
@@ -250,7 +275,7 @@ mod tests {
 
 	#[test]
 	fn storage_value_read_works() {
-		let client = block_on(build_client());
+		let client = block_on(());
 		let at = block_on(get_head(&client));
 		let key = value_key(b"Balances", b"TotalIssuance");
 		let issuance = block_on(read::<Balance>(key, &client, at));
@@ -259,7 +284,7 @@ mod tests {
 
 	#[test]
 	fn storage_map_read_works() {
-		let client = block_on(build_client());
+		let client = block_on(test_client());
 		let at = block_on(get_head(&client));
 		// web3 foundation technical account in kusama.
 		let account =
@@ -274,7 +299,7 @@ mod tests {
 
 	#[test]
 	fn get_storage_size_works_map() {
-		let client = block_on(build_client());
+		let client = block_on(test_client());
 		let at = block_on(get_head(&client));
 		let hash = map_prefix_key(b"Staking", b"Validators");
 		let size = block_on(get_storage_size(hash, &client, at)).unwrap();
@@ -284,7 +309,7 @@ mod tests {
 
 	#[test]
 	fn get_storage_size_works_value() {
-		let client = block_on(build_client());
+		let client = block_on(test_client());
 		let at = block_on(get_head(&client));
 		let hash = map_prefix_key(b"Staking", b"ValidatorCount");
 		let size = block_on(get_storage_size(hash, &client, at)).unwrap();
@@ -294,7 +319,7 @@ mod tests {
 
 	#[test]
 	fn get_const_works() {
-		let client = block_on(build_client());
+		let client = block_on(test_client());
 		let at = block_on(get_head(&client));
 
 		assert!(block_on(get_const::<u32>(

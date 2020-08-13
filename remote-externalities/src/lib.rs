@@ -104,14 +104,19 @@ impl Builder {
 		self
 	}
 
-	pub fn build_into(self, ext: &mut TestExternalities) {
+	/// Build the test externalities.
+	///
+	/// This is an async function, otherwise does the same as `build`.
+	pub async fn build_async(self) -> TestExternalities {
+		let mut ext = TestExternalities::new_empty();
 		let uri = self.uri.unwrap_or(String::from("ws://localhost:9944"));
 
-		let transport = wait!(jsonrpsee::transport::ws::WsTransportClient::new(&uri))
+		let transport = jsonrpsee::transport::ws::WsTransportClient::new(&uri)
+			.await
 			.expect("Failed to connect to client");
 		let client: jsonrpsee::Client = jsonrpsee::raw::RawClient::new(transport).into();
 
-		let head = wait!(sub_storage::get_head(&client));
+		let head = sub_storage::get_head(&client).await;
 		let at = self.at.unwrap_or(head);
 
 		info!(target: LOG_TARGET, "connecting to node {} at {:?}", uri, at);
@@ -120,17 +125,14 @@ impl Builder {
 			let mut filtered_kv = vec![];
 			for f in self.module_filter {
 				let hashed_prefix = twox_128(f.as_bytes());
-				debug!(
+				info!(
 					target: LOG_TARGET,
 					"Downloading data for module {} (prefix: {:?}).",
 					f,
 					hashed_prefix.hex_display()
 				);
-				let module_kv = wait!(sub_storage::get_pairs(
-					StorageKey(hashed_prefix.to_vec()),
-					&client,
-					at
-				));
+				let module_kv =
+					sub_storage::get_pairs(StorageKey(hashed_prefix.to_vec()), &client, at).await;
 
 				for kv in module_kv.into_iter().map(|(k, v)| (k.0, v.0)) {
 					filtered_kv.push(kv);
@@ -138,15 +140,12 @@ impl Builder {
 			}
 			filtered_kv
 		} else {
-			debug!(target: LOG_TARGET, "Downloading data for all modules.");
-			wait!(sub_storage::get_pairs(
-				StorageKey(Default::default()),
-				&client,
-				at
-			))
-			.into_iter()
-			.map(|(k, v)| (k.0, v.0))
-			.collect::<Vec<_>>()
+			info!(target: LOG_TARGET, "Downloading data for all modules.");
+			sub_storage::get_pairs(StorageKey(Default::default()), &client, at)
+				.await
+				.into_iter()
+				.map(|(k, v)| (k.0, v.0))
+				.collect::<Vec<_>>()
 		};
 
 		// inject all the scraped keys and values.
@@ -164,6 +163,8 @@ impl Builder {
 		for (k, v) in self.inject.into_iter() {
 			ext.insert(k, v);
 		}
+
+		ext
 	}
 
 	/// Build the test externalities.

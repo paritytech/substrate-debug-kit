@@ -22,13 +22,13 @@ structopt = { version = "0.3" }
 
 sub-storage = { path = "../sub-storage", features = ["helpers"] }
 
-sp-core = { version = "2.0.0-rc5" }
-sp-io = { version = "2.0.0-rc5" }
-sp-runtime = { version = "2.0.0-rc5" }
-sp-npos-elections = { version = "2.0.0-rc5" }
-frame-support = { version = "2.0.0-rc5" }
-frame-system = { version = "2.0.0-rc5" }
-pallet-staking = { version = "2.0.0-rc5" }
+sp-core = { path = "../../substrate/primitives/core" }
+sp-io = { path = "../../substrate/primitives/io" }
+sp-runtime = { path = "../../substrate/primitives/runtime" }
+sp-npos-elections = { path = "../../substrate/primitives/npos-elections" }
+frame-support = { path = "../../substrate/frame/support" }
+frame-system = { path = "../../substrate/frame/system" }
+pallet-staking = { path = "../../substrate/frame/staking" }
 
 [dev-dependencies]
 assert_cmd = "1.0.1"

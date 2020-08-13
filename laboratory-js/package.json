@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@polkadot/api": "^1.28.1",
+    "blessed": "^0.1.81",
+    "cli-progress": "^3.8.2"
+  }
+}
