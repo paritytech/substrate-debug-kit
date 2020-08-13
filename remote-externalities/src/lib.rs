@@ -254,7 +254,6 @@ mod tests_dummy {
 	macro_rules! init_log {
 		() => {
 			let _ = env_logger::Builder::from_default_env()
-				.filter_level(log::LevelFilter::Debug)
 				.format_module_path(false)
 				.format_level(true)
 				.try_init();
