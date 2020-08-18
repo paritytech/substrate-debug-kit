@@ -275,7 +275,7 @@ mod tests {
 
 	#[test]
 	fn storage_value_read_works() {
-		let client = block_on(());
+		let client = block_on(test_client());
 		let at = block_on(get_head(&client));
 		let key = value_key(b"Balances", b"TotalIssuance");
 		let issuance = block_on(read::<Balance>(key, &client, at));

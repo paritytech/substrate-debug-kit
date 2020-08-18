@@ -5,6 +5,6 @@ members = [
 	"offline-election",
 	"sub-du",
 	"remote-externalities",
-	"phragmms-remote-test"
-	# "laboratory",
+	# "phragmms-remote-test" // cannot be added until phragmms is merged into substrate.
+	# "laboratory", // cannot be added until.. probably never.
 ]
