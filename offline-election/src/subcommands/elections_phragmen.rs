@@ -2,6 +2,7 @@ use crate::primitives::{AccountId, Balance, Hash};
 use crate::{network, storage, Client, CouncilConfig, Currency, Opt, LOG_TARGET};
 use sp_npos_elections::*;
 use sp_runtime::traits::Convert;
+use sp_runtime::traits::Zero;
 use std::collections::BTreeMap;
 
 const MODULE: &[u8] = b"PhragmenElection";
@@ -109,8 +110,13 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 	let ElectionResult {
 		winners,
 		assignments,
-	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(count, 0, candidates, all_voters)
-		.expect("Phragmen failed to elect.");
+	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
+		count,
+		0,
+		candidates,
+		all_voters.clone(),
+	)
+	.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
 
 	let elected_stashes = winners
@@ -129,7 +135,7 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 
 	if iterations > 0 {
 		// prepare and run post-processing.
-		unimplemented!();
+		unimplemented!()
 	}
 
 	log::info!(target: LOG_TARGET, "👨🏻‍⚖️ Members:");
@@ -157,4 +163,30 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 			println!("");
 		}
 	}
+
+	let new_members = winners
+		.into_iter()
+		.take(desired_members as usize)
+		.collect::<Vec<_>>();
+	let mut prime_votes: Vec<_> = new_members
+		.iter()
+		.map(|(c, _)| (c, VoteWeight::zero()))
+		.collect();
+	for (_, stake, targets) in all_voters.into_iter() {
+		for (votes, who) in targets
+			.iter()
+			.enumerate()
+			.map(|(votes, who)| ((16 - votes) as u32, who))
+		{
+			if let Ok(i) = prime_votes.binary_search_by_key(&who, |k| k.0) {
+				prime_votes[i].1 += stake * votes as VoteWeight;
+			}
+		}
+	}
+	let prime = prime_votes
+		.into_iter()
+		.max_by_key(|x| x.1)
+		.map(|x| x.0.clone());
+
+	log::info!(target: LOG_TARGET, "👑 Prime: {:?}", prime);
 }

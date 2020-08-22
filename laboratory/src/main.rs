@@ -41,8 +41,6 @@ async fn main() {
 	// coinbase(client).await
 }
 
-async fn max_score_submission(at: Hash, client: &Client) {}
-
 /// Checks the account balance before and after the given block hash. Good for testing slash/reward.
 async fn account_balance_around_block(account: &AccountId, at: Hash, client: &Client) {
 	let block = network::get_block(client, at).await.block;

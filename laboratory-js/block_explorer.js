@@ -56,7 +56,7 @@ async function search(from, until, query) {
 
 async function connect() {
 	// let endpoint = "wss://rpc.polkadot.io"
-	let endpoint = "ws://localhost:9944"
+	let endpoint = "wss://rpc.polkadot.io"
 	const provider = new api.WsProvider(endpoint);
 	substrate = await api.ApiPromise.create({ provider });
 }
@@ -153,10 +153,15 @@ async function main() {
 	search(now, lastDay(now), "submit_election_solution")
 }
 
-(async () => {
-	try {
-		await main();
-	} catch (e) {
-		console.error(e)
-	}
-})();
+// (async () => {
+// 	try {
+// 		await main();
+// 	} catch (e) {
+// 		console.error(e)
+// 	}
+// })();
+
+module.exports = {
+	head: head,
+	connect: connect,
+}
