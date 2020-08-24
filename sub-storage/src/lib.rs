@@ -251,6 +251,7 @@ pub async fn get_storage_size(key: StorageKey, client: &Client, at: Hash) -> Opt
 mod tests {
 	use super::*;
 	use async_std::task::block_on;
+	use frame_support::Twox64Concat;
 	use frame_system::AccountInfo;
 	use jsonrpsee::{raw::RawClient, transport::ws::WsTransportClient, Client};
 	use pallet_balances::AccountData;

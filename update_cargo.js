@@ -3,14 +3,14 @@ const path = require('path')
 const dirs = ["remote-externalities", "offline-election", "sub-storage", "sub-du"]
 
 const VERSION_TYPE = {
-	EXACT: "2.0.0-rc5",
+	EXACT: "2.0.0-rc6",
 	GIT: "master",
 	LOCAL: "",
 }
 
 const SPECIAL_VERSIONS = {
-	"frame-metadata": "11.0.0-rc5",
-	"sp-externalities": "0.8.0-rc5",
+	"frame-metadata": "11.0.0-rc6",
+	"sp-externalities": "0.8.0-rc6",
 };
 
 function set_exact(package, version, with_optional) {

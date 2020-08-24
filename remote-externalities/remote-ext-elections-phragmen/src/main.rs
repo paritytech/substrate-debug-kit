@@ -109,13 +109,13 @@ const URI: &'static str = "wss://rpc.polkadot.io";
 async fn main() -> () {
 	init_log!();
 
-	let client = sub_storage::create_ws_client(URI).await;
-	let now = sub_storage::get_head(&client).await;
+	// let client = sub_storage::create_ws_client(URI).await;
+	// let now = sub_storage::get_head(&client).await;
 
 	// last good call to do_phragmen: https://polkadot.subscan.io/block/1209600
-	// let now: sub_storage::Hash =
-	// 	hex_literal::hex!("fffefedcad072dcafb07efb43a3fd112b118833d3e1f29caaf1407cf0aac2c8e")
-	// 		.into();
+	let now: sub_storage::Hash =
+		hex_literal::hex!("fffefedcad072dcafb07efb43a3fd112b118833d3e1f29caaf1407cf0aac2c8e")
+			.into();
 
 	remote_externalities::Builder::new()
 		.module("PhragmenElection")
@@ -126,7 +126,9 @@ async fn main() -> () {
 		.execute_with(|| {
 			// ensure state has been read correctly
 			assert!(Elections::members().len() > 0);
-			Elections::do_phragmen();
+
+			// Requires this function to be manually set to pub.
+			// Elections::do_phragmen();
 			println!("new members: {:?}", Elections::members());
 		})
 }
