@@ -260,7 +260,7 @@ mod tests {
 	type Nonce = u32;
 
 	#[cfg(feature = "remote-test-kusama")]
-	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/" ;
+	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
 	#[cfg(feature = "remote-test-polkadot")]
 	const TEST_URI: &'static str = "wss://rpc.polkadot.io/";
 	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]

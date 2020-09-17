@@ -1,8 +1,15 @@
+//! A remote ext template for elections-phragmen pallet in a live chain.
+//!
+//! Note: You need to have this repo cloned next to a local substrate repo, and have all the
+//! dependencies pointed to a local one. To do so, use `node update_cargo.js local`.
+
 use frame_support::impl_outer_origin;
-use frame_support::{parameter_types, weights::constants::RocksDbWeight};
+use frame_support::{parameter_types, IterableStorageMap, StorageMap, weights::constants::RocksDbWeight};
 use sp_core::H256;
 use sp_runtime::traits::Convert;
 use sp_runtime::traits::IdentityLookup;
+use pallet_elections_phragmen::*;
+use frame_support::migration::*;
 
 pub struct CurrencyToVoteHandler;
 impl CurrencyToVoteHandler {
@@ -72,6 +79,7 @@ impl frame_system::Trait for Runtime {
 
 impl pallet_balances::Trait for Runtime {
 	type Balance = Balance;
+	type MaxLocks = ();
 	type Event = ();
 	type DustRemoval = ();
 	type ExistentialDeposit = ();
@@ -93,7 +101,8 @@ impl pallet_elections_phragmen::Trait for Runtime {
 	type ChangeMembers = ();
 	type InitializeMembers = ();
 	type CandidacyBond = ();
-	type VotingBond = ();
+	type VotingBondBase = ();
+	type VotingBondFactor = ();
 	type TermDuration = ();
 	type DesiredMembers = DesiredMembers;
 	type DesiredRunnersUp = DesiredRunnersUp;
@@ -103,19 +112,14 @@ impl pallet_elections_phragmen::Trait for Runtime {
 	type WeightInfo = ();
 }
 
-const URI: &'static str = "wss://rpc.polkadot.io";
+const URI: &'static str = "wss://kusama-rpc.polkadot.io";
 
 #[async_std::main]
 async fn main() -> () {
+
 	init_log!();
-
-	// let client = sub_storage::create_ws_client(URI).await;
-	// let now = sub_storage::get_head(&client).await;
-
-	// last good call to do_phragmen: https://polkadot.subscan.io/block/1209600
-	let now: sub_storage::Hash =
-		hex_literal::hex!("fffefedcad072dcafb07efb43a3fd112b118833d3e1f29caaf1407cf0aac2c8e")
-			.into();
+	let client = sub_storage::create_ws_client(URI).await;
+	let now = sub_storage::get_head(&client).await;
 
 	remote_externalities::Builder::new()
 		.module("PhragmenElection")
@@ -124,11 +128,23 @@ async fn main() -> () {
 		.build_async()
 		.await
 		.execute_with(|| {
-			// ensure state has been read correctly
-			assert!(Elections::members().len() > 0);
 
-			// Requires this function to be manually set to pub.
-			// Elections::do_phragmen();
-			println!("new members: {:?}", Elections::members());
+			let random_voter = <StorageKeyIterator<AccountId, (Balance, Vec<AccountId>), frame_support::Twox64Concat>>::new(
+				b"PhragmenElection",
+				b"Voting",
+			).skip(5)
+			.take(1)
+			.map(|(voter, (stake, votes))| (voter, stake, votes))
+			.collect::<Vec<_>>();
+
+			let (random_voter, stake, votes) = random_voter.first().unwrap();
+
+
+			pallet_elections_phragmen::migrations::migrate_to_recorded_deposit::<Runtime>(1000_000);
+
+			let voting = <Voting<Runtime>>::get(random_voter);
+			assert_eq!(&voting.votes, votes);
+			assert_eq!(voting.stake, *stake);
+			assert_eq!(voting.deposit, 1000_000);
 		})
 }

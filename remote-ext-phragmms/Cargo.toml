@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["kianenigma <kian.peymani@gmail.com>"]
 edition = "2018"
 
+# This cannot be in the global workspace due to dependency gitch.
+[workspace]
+
 [dependencies]
 async-std = { version = "1.6.2", features = ["attributes"] }
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }

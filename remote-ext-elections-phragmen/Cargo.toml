@@ -4,7 +4,8 @@ version = "0.1.0"
 authors = ["kianenigma <kian.peymani@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# This cannot be in the global workspace due to dependency gitch.
+[workspace]
 
 [dependencies]
 async-std = { version = "1.6.2", features = ["attributes"] }
