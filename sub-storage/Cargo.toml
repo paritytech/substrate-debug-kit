@@ -21,8 +21,8 @@ pallet-balances = { version = "2.0.0-rc6", optional = true }
 ansi_term = { version = "0.12.1", optional = true }
 
 [dev-dependencies]
-async-std = { version = "1.6.2" }
-hex-literal = "0.3.0"
+async-std = { version = "1.6.3" }
+hex-literal = "0.3.1"
 frame-system = { version = "2.0.0-rc6" }
 pallet-balances = { version = "2.0.0-rc6" }
 pallet-staking = { version = "2.0.0-rc6" }

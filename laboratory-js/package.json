@@ -24,7 +24,7 @@
     "webpack-cli": "^3.1.2"
   },
   "dependencies": {
-    "@polkadot/api": "1.29.1",
+    "@polkadot/api": "1.31.2",
     "bn.js": "^5.1.3"
   }
 }

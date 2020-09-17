@@ -1,6 +1,6 @@
 import { ApiPromise } from "@polkadot/api";
-import { perbillTest } from "./lab"
+import * as lab from "./lab";
 
 (async () => {
-	await perbillTest()
+	await lab.latestElectionSubmissions()
 })()

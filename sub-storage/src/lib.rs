@@ -251,7 +251,6 @@ pub async fn get_storage_size(key: StorageKey, client: &Client, at: Hash) -> Opt
 mod tests {
 	use super::*;
 	use async_std::task::block_on;
-	use frame_support::Twox64Concat;
 	use frame_system::AccountInfo;
 	use jsonrpsee::{raw::RawClient, transport::ws::WsTransportClient, Client};
 	use pallet_balances::AccountData;
@@ -261,7 +260,7 @@ mod tests {
 	type Nonce = u32;
 
 	#[cfg(feature = "remote-test-kusama")]
-	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
+	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/" ;
 	#[cfg(feature = "remote-test-polkadot")]
 	const TEST_URI: &'static str = "wss://rpc.polkadot.io/";
 	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]

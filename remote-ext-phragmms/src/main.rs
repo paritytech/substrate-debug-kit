@@ -1,7 +1,7 @@
-use frame_support::impl_outer_origin;
-use frame_support::storage::{IterableStorageMap, StorageMap};
+use csv::Writer;
 use frame_support::{
-	impl_outer_dispatch, parameter_types,
+	impl_outer_dispatch, impl_outer_origin, parameter_types,
+	storage::{IterableStorageMap, StorageMap},
 	weights::{constants::RocksDbWeight, Weight},
 };
 use logging_timer::timer;
@@ -10,14 +10,14 @@ use sp_core::H256;
 use sp_npos_elections::{
 	assignment_ratio_to_staked_normalized, ElectionResult as PrimitiveElectionResult, VoteWeight,
 };
-use sp_runtime::curve::PiecewiseLinear;
-use sp_runtime::testing::TestXt;
-use sp_runtime::traits::Convert;
-use sp_runtime::traits::IdentityLookup;
-use sp_runtime::Perbill;
+use sp_runtime::{
+	curve::PiecewiseLinear,
+	testing::TestXt,
+	traits::{Convert, IdentityLookup},
+	Perbill,
+};
 use std::cell::RefCell;
 use sub_storage::Hash;
-use csv::Writer;
 
 pub struct CurrencyToVoteHandler;
 
@@ -76,39 +76,39 @@ impl_outer_dispatch! {
 }
 
 impl frame_system::Trait for Runtime {
+	type AccountData = pallet_balances::AccountData<Balance>;
+	type AccountId = AccountId;
+	type AvailableBlockRatio = AvailableBlockRatio;
 	type BaseCallFilter = ();
-	type Origin = Origin;
-	type Index = u32;
+	type BlockExecutionWeight = ();
+	type BlockHashCount = BlockHashCount;
 	type BlockNumber = BlockNumber;
 	type Call = Call;
+	type DbWeight = RocksDbWeight;
+	type Event = ();
+	type ExtrinsicBaseWeight = ();
 	type Hash = H256;
 	type Hashing = ::sp_runtime::traits::BlakeTwo256;
-	type AccountId = AccountId;
-	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type Event = ();
-	type BlockHashCount = BlockHashCount;
-	type MaximumBlockWeight = MaximumBlockWeight;
-	type DbWeight = RocksDbWeight;
-	type BlockExecutionWeight = ();
-	type ExtrinsicBaseWeight = ();
-	type MaximumExtrinsicWeight = MaximumBlockWeight;
-	type AvailableBlockRatio = AvailableBlockRatio;
+	type Index = u32;
+	type Lookup = IdentityLookup<Self::AccountId>;
 	type MaximumBlockLength = MaximumBlockLength;
-	type Version = ();
+	type MaximumBlockWeight = MaximumBlockWeight;
+	type MaximumExtrinsicWeight = MaximumBlockWeight;
 	type ModuleToIndex = ();
-	type AccountData = pallet_balances::AccountData<Balance>;
-	type OnNewAccount = ();
 	type OnKilledAccount = ();
+	type OnNewAccount = ();
+	type Origin = Origin;
 	type SystemWeightInfo = ();
+	type Version = ();
 }
 
 impl pallet_balances::Trait for Runtime {
-	type Balance = Balance;
-	type Event = ();
-	type DustRemoval = ();
-	type ExistentialDeposit = ();
 	type AccountStore = frame_system::Module<Runtime>;
+	type Balance = Balance;
+	type DustRemoval = ();
+	type Event = ();
+	type ExistentialDeposit = ();
 	type WeightInfo = ();
 }
 
@@ -116,9 +116,9 @@ parameter_types! {
 	pub const MinimumPeriod: u64 = 5;
 }
 impl pallet_timestamp::Trait for Runtime {
+	type MinimumPeriod = MinimumPeriod;
 	type Moment = u64;
 	type OnTimestampSet = ();
-	type MinimumPeriod = MinimumPeriod;
 	type WeightInfo = ();
 }
 
@@ -148,15 +148,15 @@ impl pallet_session::SessionHandler<AccountId> for TestSessionHandler {
 }
 
 impl pallet_session::Trait for Runtime {
-	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, Staking>;
-	type Keys = SessionKeys;
-	type ShouldEndSession = pallet_session::PeriodicSessions<(), ()>;
-	type SessionHandler = TestSessionHandler;
+	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
 	type Event = ();
+	type Keys = SessionKeys;
+	type NextSessionRotation = pallet_session::PeriodicSessions<(), ()>;
+	type SessionHandler = TestSessionHandler;
+	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, Staking>;
+	type ShouldEndSession = pallet_session::PeriodicSessions<(), ()>;
 	type ValidatorId = <Self as frame_system::Trait>::AccountId;
 	type ValidatorIdOf = pallet_staking::StashOf<Self>;
-	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
-	type NextSessionRotation = pallet_session::PeriodicSessions<(), ()>;
 	type WeightInfo = ();
 }
 
@@ -193,32 +193,32 @@ impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Runt
 where
 	Call: From<LocalCall>,
 {
-	type OverarchingCall = Call;
 	type Extrinsic = Extrinsic;
+	type OverarchingCall = Call;
 }
 
 pub type Extrinsic = TestXt<Call, ()>;
 
 impl pallet_staking::Trait for Runtime {
-	type Currency = pallet_balances::Module<Runtime>;
-	type UnixTime = Timestamp;
-	type CurrencyToVote = CurrencyToVoteHandler;
-	type RewardRemainder = ();
-	type Event = ();
-	type Slash = ();
-	type Reward = ();
-	type SessionsPerEra = ();
-	type SlashDeferDuration = ();
-	type SlashCancelOrigin = frame_system::EnsureRoot<<Self as frame_system::Trait>::AccountId>;
 	type BondingDuration = BondingDuration;
-	type SessionInterface = Self;
-	type RewardCurve = RewardCurve;
-	type NextNewSession = Session;
-	type ElectionLookahead = ();
 	type Call = Call;
+	type Currency = pallet_balances::Module<Runtime>;
+	type CurrencyToVote = CurrencyToVoteHandler;
+	type ElectionLookahead = ();
+	type Event = ();
 	type MaxIterations = ();
-	type MinSolutionScoreBump = MinSolutionScoreBump;
 	type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
+	type MinSolutionScoreBump = MinSolutionScoreBump;
+	type NextNewSession = Session;
+	type Reward = ();
+	type RewardCurve = RewardCurve;
+	type RewardRemainder = ();
+	type SessionInterface = Self;
+	type SessionsPerEra = ();
+	type Slash = ();
+	type SlashCancelOrigin = frame_system::EnsureRoot<<Self as frame_system::Trait>::AccountId>;
+	type SlashDeferDuration = ();
+	type UnixTime = Timestamp;
 	type UnsignedPriority = UnsignedPriority;
 	type WeightInfo = ();
 }
@@ -238,7 +238,7 @@ async fn main() -> () {
 	.unwrap();
 
 	let mut wtr = Writer::from_path("./out.csv").unwrap();
-	wtr.write_record(&["era", "phragmen(5)", "phragmms(5)"])
+	wtr.write_record(&["era", "phragmen(5)", "time(ms)", "phragmms(5)", "time(ms)"])
 		.unwrap();
 
 	loop {
@@ -271,6 +271,9 @@ async fn main() -> () {
 }
 
 async fn run(now: Hash, era: u32, wrt: &mut csv::Writer<std::fs::File>) {
+	// 1 new DOT
+	const THRESHOLD: u128 = 1000_000_000_000;
+	const MAX_ITER: usize = 10;
 	remote_externalities::Builder::new()
 		.module("Staking")
 		.at(now)
@@ -318,8 +321,9 @@ async fn run(now: Hash, era: u32, wrt: &mut csv::Writer<std::fs::File>) {
 				all_nominators.len()
 			);
 
-			let phragmms_score = {
+			let (phragmms_score, phragmms_time) = {
 				let time = timer!("phragmms-core");
+				let start = std::time::Instant::now();
 				let PrimitiveElectionResult {
 					winners,
 					assignments,
@@ -327,13 +331,13 @@ async fn run(now: Hash, era: u32, wrt: &mut csv::Writer<std::fs::File>) {
 					Staking::validator_count() as usize,
 					all_validators.clone(),
 					all_nominators.clone(),
-					Some((5, 0)),
+					Some((MAX_ITER, THRESHOLD)),
 				)
 				.unwrap();
+				let elapsed = start.elapsed().as_millis();
 				drop(time);
 
 				if Staking::era_election_status().is_open() {
-					let time = timer!("phragmms-prepare");
 					let (winners, compact, score, size) =
 						pallet_staking::offchain_election::prepare_submission::<Runtime>(
 							assignments,
@@ -341,7 +345,6 @@ async fn run(now: Hash, era: u32, wrt: &mut csv::Writer<std::fs::File>) {
 							true,
 						)
 						.unwrap();
-					drop(time);
 
 					let validation_result = Staking::check_and_replace_solution(
 						winners,
@@ -355,14 +358,15 @@ async fn run(now: Hash, era: u32, wrt: &mut csv::Writer<std::fs::File>) {
 						"Validation result of phragmms if submitted would have been: {:?}",
 						validation_result,
 					);
-					score
+					(score, elapsed)
 				} else {
 					panic!("Election window is not open at this given block. Run this test when it is open.");
 				}
 			};
 
-			let time = timer!("phragmen");
-			let phragmen_score = {
+			let (phragmen_score, phragmen_time) = {
+				let time = timer!("phragmen-core");
+				let start = std::time::Instant::now();
 				let PrimitiveElectionResult {
 					winners,
 					assignments,
@@ -370,9 +374,11 @@ async fn run(now: Hash, era: u32, wrt: &mut csv::Writer<std::fs::File>) {
 					Staking::validator_count() as usize,
 					all_validators.clone(),
 					all_nominators.clone(),
-					Some((5, 0)),
+					Some((MAX_ITER, THRESHOLD)),
 				)
 				.unwrap();
+				let elapsed = start.elapsed().as_millis();
+				drop(time);
 
 				let winners = sp_npos_elections::to_without_backing(winners);
 
@@ -386,9 +392,8 @@ async fn run(now: Hash, era: u32, wrt: &mut csv::Writer<std::fs::File>) {
 					winners.as_ref(),
 					staked.as_ref(),
 				);
-				sp_npos_elections::evaluate_support(&support)
+				(sp_npos_elections::evaluate_support(&support), elapsed)
 			};
-			drop(time);
 
 			if sp_npos_elections::is_score_better(phragmms_score, phragmen_score, Perbill::zero()) {
 				println!(
@@ -405,7 +410,9 @@ async fn run(now: Hash, era: u32, wrt: &mut csv::Writer<std::fs::File>) {
 			wrt.write_record(&[
 				format!("{}", era),
 				format!("{}", phragmen_score[0]),
+				format!("{}", phragmen_time),
 				format!("{}", phragmms_score[0]),
+				format!("{}", phragmms_time),
 			])
 			.unwrap();
 			wrt.flush().unwrap();

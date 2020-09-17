@@ -1,8 +1,8 @@
 [workspace]
 
 members = [
+	"sub-du",
 	"sub-storage",
 	"offline-election",
-	"sub-du",
 	"remote-externalities",
 ]
