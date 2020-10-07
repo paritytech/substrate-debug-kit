@@ -2,11 +2,7 @@ use ansi_term::{Colour::*, Style};
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed, StorageEntryType};
 use separator::Separatable;
 use structopt::StructOpt;
-use sub_storage::get_head;
-use sub_storage::get_metadata;
-use sub_storage::unwrap_decoded;
-use sub_storage::Hash;
-use sub_storage::StorageKey;
+use sub_storage::{get_head, get_metadata, unwrap_decoded, Hash, StorageKey};
 
 const KB: usize = 1024;
 const MB: usize = KB * KB;
@@ -179,7 +175,7 @@ async fn main() -> () {
 		.expect("Runtime Metadata failed to decode");
 	let metadata = prefixed_metadata.1;
 
-	if let RuntimeMetadata::V11(inner) = metadata {
+	if let RuntimeMetadata::V12(inner) = metadata {
 		let decode_modules = unwrap_decoded(inner.modules);
 		for module in decode_modules.into_iter() {
 			let name = unwrap_decoded(module.name);

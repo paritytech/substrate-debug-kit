@@ -8,10 +8,7 @@
 
 use codec::Decode;
 use frame_support::StorageHasher;
-use jsonrpsee::{
-	common::{to_value as to_json_value, Params},
-	Client,
-};
+use jsonrpsee::common::{to_value as to_json_value, Params};
 use sp_core::hashing::twox_128;
 use sp_runtime::traits::BlakeTwo256;
 use std::fmt::Debug;
@@ -24,6 +21,8 @@ pub mod helpers;
 pub use sp_core::storage::{StorageData, StorageKey};
 /// The hash type used by this crate.
 pub type Hash = sp_core::hash::H256;
+/// The client type
+pub type Client = jsonrpsee::Client;
 
 /// Create a client
 pub async fn create_ws_client(endpoint: &str) -> Client {
@@ -163,7 +162,7 @@ pub async fn get_const<T: Decode>(
 		.expect("Runtime Metadata failed to decode");
 	let metadata = prefixed_metadata.1;
 
-	if let RuntimeMetadata::V11(inner) = metadata {
+	if let RuntimeMetadata::V12(inner) = metadata {
 		let decode_modules = unwrap_decoded(inner.modules);
 		for module_encoded in decode_modules.into_iter() {
 			let mod_name = unwrap_decoded(module_encoded.name);

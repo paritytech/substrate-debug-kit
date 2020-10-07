@@ -1,8 +1,10 @@
-use crate::primitives::{AccountId, Balance, Hash};
-use crate::{network, storage, Client, CouncilConfig, Currency, Opt, LOG_TARGET};
+use crate::{
+	network,
+	primitives::{AccountId, Balance, Hash},
+	storage, Client, CouncilConfig, Currency, Opt, LOG_TARGET,
+};
 use sp_npos_elections::*;
-use sp_runtime::traits::Convert;
-use sp_runtime::traits::Zero;
+use sp_runtime::traits::{Convert, Zero};
 use std::collections::BTreeMap;
 
 const MODULE: &[u8] = b"PhragmenElection";
@@ -112,9 +114,9 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 		assignments,
 	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
 		count,
-		0,
 		candidates,
 		all_voters.clone(),
+		None,
 	)
 	.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
@@ -129,8 +131,8 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 	t_stop!(ratio_into_staked_run);
 
 	t_start!(build_support_map_run);
-	let (supports, _) =
-		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice());
+	let supports =
+		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).unwrap();
 	t_stop!(build_support_map_run);
 
 	if iterations > 0 {

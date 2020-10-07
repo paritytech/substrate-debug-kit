@@ -149,6 +149,11 @@ impl Builder {
 		};
 
 		// inject all the scraped keys and values.
+		info!(
+			target: LOG_TARGET,
+			"injecting a total of {} keys",
+			keys_and_values.len()
+		);
 		for (k, v) in keys_and_values {
 			trace!(
 				target: LOG_TARGET,
@@ -215,6 +220,11 @@ impl Builder {
 		};
 
 		// inject all the scraped keys and values.
+		info!(
+			target: LOG_TARGET,
+			"injecting a total of {} keys",
+			keys_and_values.len()
+		);
 		for (k, v) in keys_and_values {
 			trace!(
 				target: LOG_TARGET,
@@ -288,7 +298,7 @@ mod tests_dummy {
 		type AvailableBlockRatio = ();
 		type MaximumBlockLength = ();
 		type Version = ();
-		type ModuleToIndex = ();
+		type PalletInfo = ();
 		type AccountData = ();
 		type OnNewAccount = ();
 		type OnKilledAccount = ();

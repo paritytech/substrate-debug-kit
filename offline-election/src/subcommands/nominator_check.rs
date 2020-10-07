@@ -31,7 +31,13 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 
 		if let Some(index) = sorted.iter().position(|indie| indie.who == who) {
 			active_edges.push((v.clone(), sorted[index].value, index));
-			log::debug!(target: LOG_TARGET, "sorted exposure of {:?}", v);
+			log::debug!(
+				target: LOG_TARGET,
+				"sorted exposure of {:?} (own = {:?}, total = {:?})",
+				v,
+				e.own,
+				e.total
+			);
 			sorted.iter().for_each(|e| {
 				log::debug!(target: LOG_TARGET, "{:?}", e);
 			});

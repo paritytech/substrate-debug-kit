@@ -26,8 +26,7 @@ use atomic_refcell::AtomicRefCell as RefCell;
 use jsonrpsee::Client;
 use separator::Separatable;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
-use std::path::PathBuf;
-use std::{convert::TryInto, fmt};
+use std::{convert::TryInto, fmt, path::PathBuf};
 use structopt::StructOpt;
 use sub_storage as storage;
 

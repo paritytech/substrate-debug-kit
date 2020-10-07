@@ -36,7 +36,7 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 			.find(|ie| ie.who == n)
 			.map(|ie| ie.value);
 		let is_dangling =
-			subcommands::dangling_nominators::is_dangling(&n, submitted_in, client, at).await;
+			subcommands::dangling_nominators::is_dangling(&who, submitted_in, client, at).await;
 		println!(
 			"\t Voted from [{:?}] || dangling: {} || exposed: {}",
 			n,

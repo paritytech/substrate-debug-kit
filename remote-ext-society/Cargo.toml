@@ -1,0 +1,27 @@
+[package]
+name = "remote-ext-society"
+version = "0.1.0"
+authors = ["kianenigma <kian.peymani@gmail.com>"]
+edition = "2018"
+
+# This cannot be in the global workspace due to dependency gitch.
+[workspace]
+
+[dependencies]
+async-std = { version = "1.6.2", features = ["attributes"] }
+codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }
+remote-externalities = { path = "../remote-externalities" }
+sub-storage = { path = "../sub-storage" }
+log = "0.4.11"
+env_logger = "0.7.1"
+hex-literal = "0.3.1"
+separator = "0.4.1"
+
+
+sp-runtime = { path = "../../substrate/primitives/runtime" }
+sp-core = { path = "../../substrate/primitives/core" }
+frame-support = { path = "../../substrate/frame/support" }
+frame-system = { path = "../../substrate/frame/system" }
+
+pallet-society = { path = "../../substrate/frame/society" }
+pallet-balances = { path = "../../substrate/frame/balances" }
