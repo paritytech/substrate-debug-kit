@@ -59,13 +59,6 @@ async fn submit_now(at: Hash) {
 				weight <= <Runtime as pallet_staking::Trait>::OffchainSolutionWeightLimit::get()
 			);
 
-			log::info!(
-				"prepared a seq-phragmen solution with {} balancing iterations and score {:?} and weight = {:?}",
-				10,
-				score.iter().map(|x| x.separated_string()).collect::<Vec<_>>(),
-				weight.separated_string(),
-			);
-
 			let era = Staking::current_era().unwrap_or_default();
 
 			let inner_call = pallet_staking::Call::<Runtime>::submit_election_solution(
@@ -78,6 +71,14 @@ async fn submit_now(at: Hash) {
 
 			let len = inner_call.encode().len();
 			let info = inner_call.get_dispatch_info();
+
+			log::info!(
+				"prepared a seq-phragmen solution with {} balancing iterations and score {:?} and weight = {:?} and len = {}",
+				10,
+				score.iter().map(|x| x.separated_string()).collect::<Vec<_>>(),
+				weight.separated_string(),
+				len,
+			);
 
 			let pre_dispatch = frame_system::CheckWeight::<Runtime>::do_pre_dispatch(&info, len);
 			let validate = frame_system::CheckWeight::<Runtime>::do_validate(&info, len);
@@ -100,14 +101,16 @@ async fn submit_now(at: Hash) {
 			.unwrap();
 
 			if !closed {
-				let output = std::process::Command::new("node")
-					.args(&["js/build/index.js", &solution_file])
-					.output()
-					.unwrap();
+				if clt::confirm("Submit the solution?", false, "n", true) {
+					let output = std::process::Command::new("node")
+						.args(&["js/build/index.js", &solution_file])
+						.output()
+						.unwrap();
 
-				log::info!("Exit code of js script = {}", output.status);
-				println!("STDOUT\n{}", String::from_utf8_lossy(&output.stdout));
-				println!("STDERR\n{}", String::from_utf8_lossy(&output.stderr));
+					log::info!("Exit code of js script = {}", output.status);
+					println!("STDOUT\n{}", String::from_utf8_lossy(&output.stdout));
+					println!("STDERR\n{}", String::from_utf8_lossy(&output.stderr));
+				}
 			}
 		});
 }

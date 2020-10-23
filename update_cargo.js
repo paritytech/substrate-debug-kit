@@ -5,7 +5,7 @@ const dirs = ["remote-externalities", "offline-election", "sub-storage", "sub-du
 const VERSION_TYPE = {
 	EXACT: "2.0.0",
 	BRANCH: "master",
-	COMMIT: "81f3e7caf351c27aab518ee3b640c06b1a4392bf",
+	COMMIT: "6687fa111e5efaef6c91ec840dc7fb92d4a72820",
 	LOCAL: "",
 }
 

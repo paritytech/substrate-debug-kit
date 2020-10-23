@@ -1,5 +1,17 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
 
+export async function councilVotersScrewed() {
+	let endpoint = "ws://localhost::9944"
+	const provider = new WsProvider(endpoint);
+	const api = await ApiPromise.create({ provider })
+
+	let at = "0x715dbf4012cdca810bcb2dca507d856e3fa719f3cf072058a2be378fd3aedeeb"
+	let parent = "0xccb65b526cb22ada2cd4ac08bd73d321dd069d0d2107b4aa5e9ebe48fbd6d16f"
+	let spec = await api.rpc.state.getRuntimeVersion(at);
+	console.log(await (await api.rpc.state.getRuntimeVersion(at)).specVersion.toHuman())
+	console.log(await (await api.rpc.state.getRuntimeVersion(parent)).specVersion.toHuman())
+}
+
 export async function allNominators() {
 	let endpoint = "ws://localhost::9944"
 	const provider = new WsProvider(endpoint);

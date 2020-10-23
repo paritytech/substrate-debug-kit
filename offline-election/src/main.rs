@@ -234,6 +234,7 @@ async fn main() -> () {
 	set_default_ss58_version(address_format);
 	if address_format.eq(&Ss58AddressFormat::PolkadotAccount) {
 		*TOKEN_NAME.borrow_mut() = "DOT";
+		*DECIMAL_POINTS.borrow_mut() = 10_000_000_000;
 	}
 
 	// set total issuance

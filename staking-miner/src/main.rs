@@ -1,5 +1,6 @@
 mod mock_runtime;
 mod offchain_miner;
+mod polkadot_weight;
 
 use sub_storage::Client;
 

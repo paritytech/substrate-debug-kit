@@ -9,30 +9,10 @@ use sp_core::H256;
 use sp_runtime::{
 	curve::PiecewiseLinear,
 	testing::TestXt,
-	traits::{Convert, IdentityLookup, Saturating},
+	traits::{IdentityLookup, Saturating},
 	Perbill,
 };
 use std::cell::RefCell;
-
-pub struct CurrencyToVoteHandler;
-
-impl CurrencyToVoteHandler {
-	fn factor() -> Balance {
-		(Balances::total_issuance() / u64::max_value() as Balance).max(1)
-	}
-}
-
-impl Convert<Balance, u64> for CurrencyToVoteHandler {
-	fn convert(x: Balance) -> u64 {
-		(x / Self::factor()) as u64
-	}
-}
-
-impl Convert<u128, Balance> for CurrencyToVoteHandler {
-	fn convert(x: u128) -> Balance {
-		x * Self::factor()
-	}
-}
 
 pub(crate) type AccountId = sp_core::crypto::AccountId32;
 pub(crate) type BlockNumber = u32;
@@ -48,7 +28,7 @@ use frame_support::weights::constants::{BlockExecutionWeight, ExtrinsicBaseWeigh
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Runtime;
 
-const AVERAGE_ON_INITIALIZE_WEIGHT: Perbill = Perbill::from_percent(10);
+pub const AVERAGE_ON_INITIALIZE_WEIGHT: Perbill = Perbill::from_perthousand(25);
 parameter_types! {
 	pub const BlockHashCount: BlockNumber = 2400;
 	/// We allow for 2 seconds of compute with a 6 second average block time.
@@ -201,9 +181,8 @@ pub type Extrinsic = TestXt<Call, ()>;
 
 impl pallet_staking::Trait for Runtime {
 	type BondingDuration = BondingDuration;
-	type Call = Call;
 	type Currency = pallet_balances::Module<Runtime>;
-	type CurrencyToVote = CurrencyToVoteHandler;
+	type CurrencyToVote = frame_support::traits::U128CurrencyToVote;
 	type ElectionLookahead = ();
 	type Event = ();
 	type MaxIterations = ();
@@ -221,5 +200,5 @@ impl pallet_staking::Trait for Runtime {
 	type UnixTime = Timestamp;
 	type UnsignedPriority = UnsignedPriority;
 	type OffchainSolutionWeightLimit = OffchainSolutionWeightLimit;
-	type WeightInfo = ();
+	type WeightInfo = crate::polkadot_weight::WeightInfo<Runtime>;
 }

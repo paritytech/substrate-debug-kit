@@ -212,6 +212,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.41"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b246867b8b3b6ae56035f1eb1ed557c1d8eae97f0d53696138a50fa0e3a3b8c0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -443,6 +454,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4344512281c643ae7638bbabc3af17a11307803ec8f0fcad9fae512a8bf36467"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "clt"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ada85b237ebf9bfe564adaded2ec1786e75deb71f215f59323b26a5c70d6afa0"
+dependencies = [
+ "getopts",
+ "libc",
+ "tempdir",
 ]
 
 [[package]]
@@ -953,6 +975,15 @@ checksum = "501466ecc8a30d1d3b7fc9229b122b2ce8ed6e9d9223f1138d4babb253e51817"
 dependencies = [
  "typenum",
  "version_check",
+]
+
+[[package]]
+name = "getopts"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
+dependencies = [
+ "unicode-width",
 ]
 
 [[package]]
@@ -1998,6 +2029,19 @@ checksum = "def50a86306165861203e7f84ecffbbdfdea79f0e51039b33de1e952358c47ac"
 
 [[package]]
 name = "rand"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
+dependencies = [
+ "fuchsia-cprng",
+ "libc",
+ "rand_core 0.3.1",
+ "rdrand",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "rand"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c618c47cd3ebd209790115ab837de41425723956ad3ce2e6a7f09890947cacb9"
@@ -2250,6 +2294,15 @@ dependencies = [
  "sp-externalities",
  "sp-io",
  "sub-storage",
+]
+
+[[package]]
+name = "remove_dir_all"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
+dependencies = [
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2538,7 +2591,6 @@ dependencies = [
  "base58",
  "blake2-rfc",
  "byteorder",
- "derive_more",
  "dyn-clonable",
  "ed25519-dalek",
  "futures",
@@ -2616,6 +2668,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "sp-core",
  "sp-externalities",
+ "sp-keystore",
  "sp-runtime-interface",
  "sp-state-machine",
  "sp-std",
@@ -2624,6 +2677,21 @@ dependencies = [
  "sp-wasm-interface",
  "tracing",
  "tracing-core",
+]
+
+[[package]]
+name = "sp-keystore"
+version = "0.8.0"
+dependencies = [
+ "async-trait",
+ "derive_more",
+ "futures",
+ "merlin",
+ "parity-scale-codec",
+ "parking_lot 0.10.2",
+ "schnorrkel",
+ "sp-core",
+ "sp-externalities",
 ]
 
 [[package]]
@@ -2830,6 +2898,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "async-std",
+ "clt",
  "env_logger",
  "frame-support",
  "frame-system",
@@ -2930,6 +2999,16 @@ dependencies = [
  "quote",
  "syn",
  "unicode-xid",
+]
+
+[[package]]
+name = "tempdir"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15f2b5fb00ccdf689e0149d1b1b3c03fead81c2b37735d812fa8bddbbf41b6d8"
+dependencies = [
+ "rand 0.4.6",
+ "remove_dir_all",
 ]
 
 [[package]]
@@ -3202,6 +3281,12 @@ checksum = "6fb19cf769fa8c6a80a162df694621ebeb4dafb606470b2b2fce0be40a98a977"
 dependencies = [
  "tinyvec",
 ]
+
+[[package]]
+name = "unicode-width"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9337591893a19b88d8d87f2cec1e73fad5cdfd10e5a6f349f498ad6ea2ffb1e3"
 
 [[package]]
 name = "unicode-xid"

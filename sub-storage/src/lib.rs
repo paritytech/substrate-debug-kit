@@ -162,7 +162,7 @@ pub async fn get_const<T: Decode>(
 		.expect("Runtime Metadata failed to decode");
 	let metadata = prefixed_metadata.1;
 
-	if let RuntimeMetadata::V12(inner) = metadata {
+	if let RuntimeMetadata::V11(inner) = metadata {
 		let decode_modules = unwrap_decoded(inner.modules);
 		for module_encoded in decode_modules.into_iter() {
 			let mod_name = unwrap_decoded(module_encoded.name);
@@ -344,5 +344,23 @@ mod tests {
 			at
 		))
 		.is_none());
+	}
+
+	#[test]
+	fn dummy() {
+		let client = block_on(test_client());
+		let at: Hash =
+			hex_literal::hex!["715dbf4012cdca810bcb2dca507d856e3fa719f3cf072058a2be378fd3aedeeb"]
+				.into();
+
+		let all_voters = block_on(enumerate_map::<
+			sp_core::crypto::AccountId32,
+			(Balance, Vec<sp_core::crypto::AccountId32>),
+		>(b"PhragmenElection", b"Voting", &client, at))
+		.unwrap();
+
+		all_voters.iter().for_each(|(x, _)| println!("{:?}", x.0));
+
+		assert!(false);
 	}
 }
