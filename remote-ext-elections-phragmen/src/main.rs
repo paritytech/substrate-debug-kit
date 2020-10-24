@@ -4,29 +4,12 @@
 //! dependencies pointed to a local one. To do so, use `node update_cargo.js local`.
 
 use frame_support::impl_outer_origin;
-use frame_support::{parameter_types, IterableStorageMap, StorageMap, weights::constants::RocksDbWeight};
+use frame_support::{parameter_types, IterableStorageMap, StorageMap, weights::constants::RocksDbWeight, traits::PalletInfo};
 use sp_core::H256;
 use sp_runtime::traits::Convert;
 use sp_runtime::traits::IdentityLookup;
 use pallet_elections_phragmen::*;
 use frame_support::migration::*;
-
-pub struct CurrencyToVoteHandler;
-impl CurrencyToVoteHandler {
-	fn factor() -> Balance {
-		(Balances::total_issuance() / u64::max_value() as Balance).max(1)
-	}
-}
-impl Convert<Balance, u64> for CurrencyToVoteHandler {
-	fn convert(x: Balance) -> u64 {
-		(x / Self::factor()) as u64
-	}
-}
-impl Convert<u128, Balance> for CurrencyToVoteHandler {
-	fn convert(x: u128) -> Balance {
-		x * Self::factor()
-	}
-}
 
 macro_rules! init_log {
 	() => {
@@ -47,6 +30,12 @@ pub struct Runtime;
 
 impl_outer_origin! {
 	pub enum Origin for Runtime where system = frame_system {}
+}
+
+pub struct SystemInfo;
+impl PalletInfo for SystemInfo {
+	fn index<P: 'static>() -> Option<usize> { Some(0) }
+	fn name<P: 'static>() -> Option<&'static str> { Some("System") }
 }
 
 impl frame_system::Trait for Runtime {
@@ -70,11 +59,11 @@ impl frame_system::Trait for Runtime {
 	type AvailableBlockRatio = ();
 	type MaximumBlockLength = ();
 	type Version = ();
-	type ModuleToIndex = ();
 	type AccountData = pallet_balances::AccountData<Balance>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
+	type PalletInfo = SystemInfo;
 }
 
 impl pallet_balances::Trait for Runtime {
@@ -93,11 +82,13 @@ parameter_types! {
 	pub const DesiredRunnersUp: u32 = 13;
 }
 
+const PHRAGMEN: &'static str = "PhragmenElection";
+
 impl pallet_elections_phragmen::Trait for Runtime {
 	type ModuleId = ElectionsPhragmenModuleId;
 	type Event = ();
 	type Currency = Balances;
-	type CurrencyToVote = CurrencyToVoteHandler;
+	type CurrencyToVote = frame_support::traits::U128CurrencyToVote;
 	type ChangeMembers = ();
 	type InitializeMembers = ();
 	type CandidacyBond = ();
@@ -122,28 +113,27 @@ async fn main() -> () {
 	let now = sub_storage::get_head(&client).await;
 
 	remote_externalities::Builder::new()
-		.module("PhragmenElection")
+		.module(PHRAGMEN)
 		.uri(URI.to_owned())
 		.at(now)
 		.build_async()
 		.await
 		.execute_with(|| {
 
-			let random_voter = <StorageKeyIterator<AccountId, (Balance, Vec<AccountId>), frame_support::Twox64Concat>>::new(
+			let voters = <StorageKeyIterator<AccountId, (Balance, Vec<AccountId>), frame_support::Twox64Concat>>::new(
 				b"PhragmenElection",
 				b"Voting",
-			).skip(5)
-			.take(1)
+			)
 			.map(|(voter, (stake, votes))| (voter, stake, votes))
 			.collect::<Vec<_>>();
 
-			let (random_voter, stake, votes) = random_voter.first().unwrap();
-
 			pallet_elections_phragmen::migrations::migrate_to_recorded_deposit::<Runtime>(1000_000);
 
-			let voting = <Voting<Runtime>>::get(random_voter);
-			assert_eq!(&voting.votes, votes);
-			assert_eq!(voting.stake, *stake);
-			assert_eq!(voting.deposit, 1000_000);
+			for (voter, stake, votes) in voters {
+				let voting = <Voting<Runtime>>::get(voter);
+				assert_eq!(voting.votes, votes);
+				assert_eq!(voting.stake, stake);
+				assert_eq!(voting.deposit, 1000_000);
+			}
 		})
 }

@@ -14,14 +14,14 @@ env_logger = "0.7.1"
 log = "0.4.11"
 
 sub-storage = { path = "../sub-storage" }
-sp-io = { version = "2.0.0-rc6" }
-sp-core = { version = "2.0.0-rc6" }
-sp-externalities = { version = "0.8.0-rc6" }
+sp-io = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+sp-externalities = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
 
 [dev-dependencies]
 hex-literal = "0.3.1"
 tokio-test = "0.2.1"
-frame-system = { version = "2.0.0-rc6" }
-frame-support = { version = "2.0.0-rc6" }
-pallet-staking = { version = "2.0.0-rc6" }
-sp-runtime = { version = "2.0.0-rc6" }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+pallet-staking = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }

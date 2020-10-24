@@ -17,10 +17,10 @@ env_logger = "0.7.1"
 hex-literal = "0.3.1"
 
 
-sp-runtime = { path = "../../substrate/primitives/runtime" }
-sp-core = { path = "../../substrate/primitives/core" }
-frame-support = { path = "../../substrate/frame/support" }
-frame-system = { path = "../../substrate/frame/system" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
 
-pallet-elections-phragmen = { path = "../../substrate/frame/elections-phragmen" }
-pallet-balances = { path = "../../substrate/frame/balances" }
+pallet-elections-phragmen = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }
+pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "kiz-fix-proxy-election-drain" }

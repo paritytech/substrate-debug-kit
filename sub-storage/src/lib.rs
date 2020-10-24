@@ -163,7 +163,7 @@ pub async fn get_const<T: Decode>(
 		.expect("Runtime Metadata failed to decode");
 	let metadata = prefixed_metadata.1;
 
-	if let RuntimeMetadata::V11(inner) = metadata {
+	if let RuntimeMetadata::V12(inner) = metadata {
 		let decode_modules = unwrap_decoded(inner.modules);
 		for module_encoded in decode_modules.into_iter() {
 			let mod_name = unwrap_decoded(module_encoded.name);
