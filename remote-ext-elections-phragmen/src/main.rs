@@ -9,6 +9,7 @@ use sp_core::H256;
 use sp_runtime::traits::Convert;
 use sp_runtime::traits::IdentityLookup;
 use pallet_elections_phragmen::*;
+use frame_system::Account;
 use frame_support::migration::*;
 
 macro_rules! init_log {
@@ -114,6 +115,7 @@ async fn main() -> () {
 
 	remote_externalities::Builder::new()
 		.module(PHRAGMEN)
+		.module("System")
 		.uri(URI.to_owned())
 		.at(now)
 		.build_async()
@@ -127,13 +129,18 @@ async fn main() -> () {
 			.map(|(voter, (stake, votes))| (voter, stake, votes))
 			.collect::<Vec<_>>();
 
-			pallet_elections_phragmen::migrations::migrate_to_recorded_deposit::<Runtime>(1000_000);
+			let deposit = 1_000_000;
+			pallet_elections_phragmen::migrations::migrate_to_recorded_deposit::<Runtime>(deposit);
 
 			for (voter, stake, votes) in voters {
-				let voting = <Voting<Runtime>>::get(voter);
+				let voting = <Voting<Runtime>>::get(&voter);
 				assert_eq!(voting.votes, votes);
 				assert_eq!(voting.stake, stake);
-				assert_eq!(voting.deposit, 1000_000);
+				assert_eq!(voting.deposit, deposit);
+				let acc = Account::<Runtime>::get(&voter);
+				if acc.data.reserved < deposit {
+					println!("{}: {:?}", voter, acc);
+				}
 			}
 		})
 }
