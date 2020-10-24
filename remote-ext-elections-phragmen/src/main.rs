@@ -139,7 +139,6 @@ async fn main() -> () {
 
 			let (random_voter, stake, votes) = random_voter.first().unwrap();
 
-
 			pallet_elections_phragmen::migrations::migrate_to_recorded_deposit::<Runtime>(1000_000);
 
 			let voting = <Voting<Runtime>>::get(random_voter);
