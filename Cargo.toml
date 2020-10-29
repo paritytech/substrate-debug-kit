@@ -5,4 +5,5 @@ members = [
 	"sub-storage",
 	"offline-election",
 	"remote-externalities",
+	"tokens",
 ]

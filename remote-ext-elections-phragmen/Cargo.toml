@@ -14,8 +14,14 @@ sub-storage = { path = "../sub-storage" }
 log = "0.4.11"
 env_logger = "0.8.1"
 hex-literal = "0.3.1"
+hex = "0.4.2"
+chrono = "0.4.19"
+paste = "1.0.2"
+json = "0.12.4"
+reqwest = { version = "0.10.8", features = ["blocking"] }
 
 remote-externalities = { path = "../remote-externalities" }
+tokens = { path = "../tokens" }
 
 sp-runtime = { path = "../../substrate/primitives/runtime" }
 sp-core = { path = "../../substrate/primitives/core" }
@@ -23,4 +29,6 @@ frame-support = { path = "../../substrate/frame/support" }
 frame-system = { path = "../../substrate/frame/system" }
 
 pallet-elections-phragmen = { path = "../../substrate/frame/elections-phragmen" }
+pallet-elections-phragmen-faulty = { path = "../../substrate/frame/elections-phragmen-faulty" }
 pallet-balances = { path = "../../substrate/frame/balances" }
+pallet-timestamp = { path = "../../substrate/frame/timestamp" }

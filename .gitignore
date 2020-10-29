@@ -2,3 +2,4 @@ target/
 log
 out
 .vscode
+node_modules
