@@ -242,8 +242,18 @@ async fn main() -> () {
 
 	let elections = vec![
 		(
+			"98bb61dda86b967be2a4b73760b9706bb66582a26acb28f1d93382e89b061590",
+			vec![],
+			"2020-11-04T07:39:48+00:00",
+		),
+		(
+			"0947c4e9079d051e81ffc08078a6315ee62f2260ef27d88c4445c6efca3836dd",
+			vec![],
+			"2020-10-28T07:18:30+00:00",
+		),
+		(
 			"a419f48967f7f115ae0f2299346d261f46d502a1e0c44fe44eaee6e390e2b81e",
-			vec![200410000000u128, 1000000000000],
+			vec![200410000000, 1000000000000],
 			"2020-10-21T06:50:54+00:00",
 		),
 		(
@@ -695,10 +705,13 @@ async fn main() -> () {
 		);
 	}
 
-	// TODO: one guy is slashed correctly.
-	// TODO: why is it always 13 and 20???
+	println!("account,effective_slash");
+	for (v, record) in slash_record.iter() {
+		let sum_effective_slash = record.iter().map(|(_, x, _)| x).sum::<Balance>();
+		println!("{},{}", v, sum_effective_slash,);
+	}
+
 	// TODO: double check the list of corrupt guys with js api.
-	// TODO: which module is bonding 252580000000?
 	remote_externalities::Builder::new()
 		.module("PhragmenElection")
 		.module("Balances")

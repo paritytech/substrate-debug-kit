@@ -1,11 +1,9 @@
 import { ApiPromise } from "@polkadot/api";
-import { AccountInfo } from "@polkadot/types/interfaces/system/types";
 import BN from "bn.js";
-import { SSL_OP_CISCO_ANYCONNECT, X_OK } from "constants";
 import request, { head } from "request-promise";
 
 
-async function recordedReserved(whos: string[], api: ApiPromise): Promise<[string, Map<string, BN>, BN, BN][]> {
+async function recordedReserved(whos: string[], api: ApiPromise): Promise<[string, Array<[string, BN]>, BN, BN][]> {
 	let democracyDepositsOf = await api.query.democracy.depositOf.entries();
 	let democracyPreImages = await api.query.democracy.preimages.entries();
 
@@ -25,22 +23,24 @@ async function recordedReserved(whos: string[], api: ApiPromise): Promise<[strin
 	let good = 0;
 	let bad = 0;
 
-	let result: [string, Map<string, BN>, BN, BN][] = []
+	let result: [string, Array<[string, BN]>, BN, BN][] = []
 	for (let who of whos) {
-		let deposits: Map<string, BN> = new Map();
+		let deposits: Array<[string, BN]> = [];
 
 		// democracy: PreImage, DepositsOf,
-		democracyDepositsOf.forEach(([_, maybeDepositOf]) => {
-			let depositOf = maybeDepositOf.unwrapOrDefault();
-			let [backers, deposit] = depositOf;
-			if (backers.find((x) => x.toHuman() == who) != undefined) {
-				deposits.set("democracy.depositOf", deposit);
+		democracyDepositsOf.forEach(([prop, maybeDepositOf]) => {
+			let [backers, deposit] = maybeDepositOf.unwrapOrDefault();
+			// allow backing multiple times.
+			for (let b of backers) {
+				if (b.toHuman() == who) {
+					deposits.push([`democracy.depositOf-${prop.toHuman()}`, deposit]);
+				}
 			}
 		});
 		democracyPreImages.forEach(([_, maybePreImage]) => {
 			let perImage = maybePreImage.unwrapOrDefault();
 			if (perImage.asAvailable.provider.toHuman() == who) {
-				deposits.set("democracy.preImages", perImage.asAvailable.deposit);
+				deposits.push(["democracy.preImages", perImage.asAvailable.deposit]);
 			}
 		});
 
@@ -56,16 +56,18 @@ async function recordedReserved(whos: string[], api: ApiPromise): Promise<[strin
 		//@ts-ignore
 		let candidacy = is_member || is_runner_up || is_candidate ? api.consts.electionsPhragmen.candidacyBond : new BN(0)
 		//@ts-ignore
-		deposits.set("elections-phragmen.voter", voting)
+		deposits.push(["elections-phragmen.voter", voting])
 		//@ts-ignore
-		deposits.set("elections-phragmen.candidacy", candidacy)
+		deposits.push(["elections-phragmen.candidacy", candidacy])
 
 		// identity
 		let identity = (await api.query.identity.identityOf(who)).unwrapOrDefault();
-		deposits.set("identity.deposit", identity.deposit)
+		deposits.push(["identity.deposit", identity.deposit]);
+		let subs = (await api.query.identity.subsOf(who))[0];
+		deposits.push(["identity.subs", subs]);
 		identity.judgements.forEach(([_, j]) => {
 			if (j.isFeePaid) {
-				deposits.set("identity.judgments", j.asFeePaid)
+				deposits.push(["identity.judgments", j.asFeePaid])
 			}
 		});
 
@@ -73,7 +75,7 @@ async function recordedReserved(whos: string[], api: ApiPromise): Promise<[strin
 		indicesAccounts.forEach(([k, maybeIndex]) => {
 			let [acc, dep, frozen] = maybeIndex.unwrapOrDefault();
 			if (acc.toHuman() == who && frozen.isFalse) {
-				deposits.set(`indices${k.toHuman()}`, dep);
+				deposits.push([`indices${k.toHuman()}`, dep]);
 			}
 		});
 
@@ -81,33 +83,37 @@ async function recordedReserved(whos: string[], api: ApiPromise): Promise<[strin
 		multisigs.forEach(([_, maybeMulti]) => {
 			let multi = maybeMulti.unwrapOrDefault()
 			if (multi.depositor.toHuman() == who) {
-				deposits.set("multisig.multisig", multi.deposit);
+				deposits.push(["multisig.multisig", multi.deposit]);
 			}
 		});
 		multisigCalls.forEach(([_, maybeCall]) => {
 			let [__ , depositor, deposit] = maybeCall.unwrapOrDefault()
 			if (depositor.toHuman() == who) {
-				deposits.set("multisig.call", deposit);
+				deposits.push(["multisig.call", deposit]);
 			}
 		});
 
 		// proxy: Proxies, Anonymous(TODO), announcements
-		let proxies = (await api.query.proxy.proxies(who))[1];
-		deposits.set("proxy.proxies", proxies);
-		let announcements = (await api.query.proxy.announcements(who))[1];
-		deposits.set("proxy.announcements", announcements);
+		try {
+			let proxies = (await api.query.proxy.proxies(who))[1];
+			deposits.push(["proxy.proxies", proxies]);
+			let announcements = (await api.query.proxy.announcements(who))[1];
+			deposits.push(["proxy.announcements", announcements]);
+		} catch (e) {
+			console.error("ERROR while fetching proxy:", e, who)
+		}
 
 		// treasury: Proposals, Tips, Curator/Bounties
 		treasuryProposals.forEach(([_, maybeProp]) => {
 			let prop = maybeProp.unwrapOrDefault();
 			if (prop.proposer.toHuman() == who) {
-				deposits.set("treasury.proposals", prop.value)
+				deposits.push(["treasury.proposals", prop.bond])
 			}
 		});
 		treasuryTips.forEach(([_, maybeTip]) => {
 			let tip = maybeTip.unwrapOrDefault();
-			if (tip.who.toHuman() == who) {
-				deposits.set("treasury.tip", tip.deposit)
+			if (tip.finder.toHuman() == who) {
+				deposits.push(["treasury.tip", tip.deposit])
 			}
 		});
 		treasuryBounties.forEach(([_, maybeBounty]) => {
@@ -115,7 +121,7 @@ async function recordedReserved(whos: string[], api: ApiPromise): Promise<[strin
 			// Bounty is not funded yet, so there is still a deposit for proposer.
 			if (bounty.status.isProposed || bounty.status.isFunded) {
 				if (bounty.proposer.toHuman() == who) {
-					deposits.set("treasury.bounty.proposer", bounty.bond)
+					deposits.push(["treasury.bounty.proposer", bounty.bond])
 				}
 			} else {
 				// Curator has a deposit.
@@ -124,7 +130,7 @@ async function recordedReserved(whos: string[], api: ApiPromise): Promise<[strin
 					if (bounty.status.value && bounty.status.value.curator) {
 						//@ts-ignore
 						if (bounty.status.value.curator.toHuman() == who) {
-							deposits.set("treasury.bounty.curator", bounty.curatorDeposit)
+							deposits.push(["treasury.bounty.curator", bounty.curatorDeposit])
 						}
 					}
 				}
@@ -132,18 +138,22 @@ async function recordedReserved(whos: string[], api: ApiPromise): Promise<[strin
 		})
 
 		let sum = new BN(0);
-		for (let [_k, v] of deposits.entries()) {
+		for (let [_k, v] of deposits) {
 			sum = sum.add(v)
 		}
 
-		let chain = (await api.query.system.account(who)).data.reserved
-		let match = chain.eq(sum)
+		let accountData = (await api.query.system.account(who))
+		let match = accountData.data.reserved.eq(sum)
 		match ? good++ : bad++;
-		console.log(`${match? "✅" : "❌"} - ${who} on-chain reserved = ${chain.toHuman()} module-sum = ${sum}`)
+		console.log(`${match? "✅" : "❌"} - ${who} on-chain reserved = ${accountData.data.reserved.toHuman()} (${accountData.data.reserved.toBn()}) // module-sum = ${api.createType('Balance', sum).toHuman()} (${sum})`)
 		if (!match) {
-			console.log(deposits)
+			if (accountData.nonce.isZero()) {
+				console.log("⚠️  Nonce zero. This is probably a multisig account.")
+			}
+			console.log(accountData.toHuman())
+			deposits.forEach(([m, d]) => console.log(`+ ${m} => ${api.createType('Balance', d).toHuman()}`))
 		}
-		result.push([who, deposits, sum, chain.toBn()])
+		result.push([who, deposits, sum, accountData.data.reserved.toBn()])
 	}
 
 	console.log(good, bad)
@@ -151,21 +161,54 @@ async function recordedReserved(whos: string[], api: ApiPromise): Promise<[strin
 }
 
 async function checkAllAccounts(api: ApiPromise) {
-	let all_accounts: string[] = (await api.query.system.account.entries()).map(([acc, _]) => {
-		//@ts-ignore
-		return acc.toHuman()[0]
-	});
-	console.log(`fetched ${all_accounts.length} accounts`)
-	await recordedReserved(all_accounts, api)
+	// let all_accounts: string[] = (await api.query.system.account.entries()).map(([acc, _]) => {
+	// 	//@ts-ignore
+	// 	return acc.toHuman()[0]
+	// });
+	// console.log(`fetched ${all_accounts.length} accounts`)
+
+	let edge_cases: string[] = [
+		"1JCU9za8ZwT51LkDHoVXhLRRvBuCeqTTrdkfZsEW6CVyC2L",
+		"12yi4uHFbnSUryffXT7Xq92fbGC3iXvCs3vz9HjVgpb4sBvL",
+		// "165u1SrKMy1JYHdE5Dk2RHWGheVGfQHznfPWUp5bDtjC66AT", // anonymous
+		// "14rEVPh5hz4D6y783QCH9xgySNJVxMLaHhQKm69KChphYoEw", // anonymous
+	]
+	await recordedReserved(edge_cases, api)
 }
 
-(async () => {
-	const api = await ApiPromise.create();
-	// 126GgFcnMtV4upzmk2Qtupxbmrh6yo99W1WxYzMAoF7DGxpz has 2 indices.
-	// console.log(await recordedReserved("15kZqsp5RR3wBVbgLPsBXbatf1YJA9cak46znnMbJviwd4En", api))
-	await checkAllAccounts(api)
-	return;
+async function computeRefund(api: ApiPromise) {
+	let slashed_councilors = new Map([
+		// ["1RG5T6zGY4XovW75mTgpH6Bx7Y6uwwMmPToMCJSdMwdm4EW", new BN(1603640000000)],
+		// ["1WG3jyNqniQMRZGQUc7QD2kVLT8hkRPGMSqAb5XYQM1UDxN", new BN(1252580000000)],
+		// ["1dGsgLgFez7gt5WjX2FYzNCJtaCjGG6W9dA42d9cHngDYGg", new BN(1607240000000)],
+		// ["1hJdgnAPSjfuHZFHzcorPnFvekSHihK9jdNPWHXgeuL7zaJ", new BN(1252580000000)],
+		// ["1rwgen2jqJNNg7DpUA4jBvMjyepgiFKLLm3Bwt8pKQYP8Xf", new BN(1252580000000)],
+		// ["128qRiVjxU3TuT37tg7AX99zwqfPtj2t4nDKUv9Dvi5wzxuF", new BN(1266880000000)],
+		// ["12Vv2LsLCvPKiXdoVGa3QSs2FMF8zx2c8CPTWwLAwfYSFVS1", new BN(4252580000000)],
+		["12Y8b4C9ar162cBgycxYgxxHG7cLVs8gre9Y5xeMjW3izqer", new BN(1202910000000)],
+		// ["12mP4sjCfKbDyMRAEyLpkeHeoYtS5USY4x34n9NMwQrcEyoh", new BN(1202580000000)],
+		// ["12xG1Bn4421hUQAxKwZd9WSxZCJQwJBbwr6aZ4ZxvuR7A1Ao", new BN(1000000000000)],
+		// ["12xGDBh6zSBc3D98Jhw9jgUVsK8jiwGWHaPTK21Pgb7PJyPn", new BN(1402990000000)],
+		// ["13Gdmw7xZQVbVoojUCwnW2usEikF2a71y7aocbgZcptUtiX9", new BN(1202580000000)],
+		// ["13pdp6ALhYkfEBqBM98ztL2Xhv4MTkm9rZ9vyjyXSdirJHx6", new BN(2806820000000)],
+		// ["14krbTSTJv3aaT1VeBRX7CzoV4crr3adeF3KutdpkCttrxsZ", new BN(1000000000000)],
+		// ["14mSXQeHpF8NT1tMKu87tAbNDNjm7q9qh8hYa7BY2toNUkTo", new BN(1452990000000)],
+		// ["15BQUqtqhmqJPyvvEH5GYyWffXWKuAgoSUHuG1UeNdb8oDNT", new BN(1804170000000)],
+		// ["15MUBwP6dyVw5CXF9PjSSv7SdXQuDSwjX86v1kBodCSWVR7c", new BN(2050000000000)],
+		// ["15aKvwRqGVAwuBMaogtQXhuz9EQqUWsZJSAzomyb5xYwgBXA", new BN(1452990000000)],
+		// ["15akrup6APpRegG1TtWkYVuWHYc37tJ8XPN61vCuHQUi65Mx", new BN(1407820000000)],
+		// ["167rjWHghVwBJ52mz8sNkqr5bKu5vpchbc9CBoieBhVX714h", new BN(1000000000000)],
+	]);
 
+	let keys = Array.from(slashed_councilors.keys())
+	let stuff = await recordedReserved(keys, api)
+	console.log("who,should_reserve,has_reserve,effective_slash")
+	stuff.forEach(([who, _, should_reserve, has_reserve]) => {
+		console.log(`${who},${should_reserve},${has_reserve},${slashed_councilors.get(who)}`)
+	})
+}
+
+async function findElections(api: ApiPromise) {
 	let res = await request.get("https://explorer-31.polkascan.io/polkadot/api/v1/event?filter[module_id]=electionsphragmen&filter[event_id]=NewTerm&page[number]=1&page[size]=100")
 	res = JSON.parse(res)
 	let data = res.data
@@ -196,7 +239,11 @@ async function checkAllAccounts(api: ApiPromise) {
 	}
 
 	console.log("Done");
+}
 
-
-
+(async () => {
+	const api = await ApiPromise.create();
+	// await findElections(api);
+	await checkAllAccounts(api)
+	// await computeRefund(api);
 })()
