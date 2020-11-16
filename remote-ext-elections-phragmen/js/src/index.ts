@@ -584,12 +584,13 @@ function buildRefundTx(chain: string, slashMap: Map<string, BN>, api: ApiPromise
 	let tx = api.tx.utility.batch(transfers);
 	console.log("transaction:", tx.toHuman())
 	console.log("hex: ", tx.toHex())
+	console.log("hash:", blake2AsHex(tx.toU8a(), 256))
 	console.log("sum: ", api.createType('Balance', sum).toHuman())
 }
 
 (async () => {
-	// const provider = new WsProvider('wss://kusama-rpc.polkadot.io/')
-	const api = await ApiPromise.create()
+	const provider = new WsProvider(process.argv[2])
+	const api = await ApiPromise.create( { provider })
 	const chain = "kusama"
 
 	// -- scrape and create a new cache election json file

@@ -519,11 +519,12 @@ function buildRefundTx(chain, slashMap, api) {
     let tx = api.tx.utility.batch(transfers);
     console.log("transaction:", tx.toHuman());
     console.log("hex: ", tx.toHex());
+    console.log("hash:", util_crypto_1.blake2AsHex(tx.toU8a(), 256));
     console.log("sum: ", api.createType('Balance', sum).toHuman());
 }
 (() => __awaiter(void 0, void 0, void 0, function* () {
-    // const provider = new WsProvider('wss://kusama-rpc.polkadot.io/')
-    const api = yield api_1.ApiPromise.create();
+    const provider = new api_1.WsProvider(process.argv[2]);
+    const api = yield api_1.ApiPromise.create({ provider });
     const chain = "kusama";
     // -- scrape and create a new cache election json file
     // unlinkSync(`elections.${chain}.json`)
