@@ -32,3 +32,7 @@ pallet-elections-phragmen = { path = "../../substrate/frame/elections-phragmen" 
 pallet-elections-phragmen-faulty = { path = "../../substrate/frame/elections-phragmen-faulty" }
 pallet-balances = { path = "../../substrate/frame/balances" }
 pallet-timestamp = { path = "../../substrate/frame/timestamp" }
+
+[features]
+default = []
+kusama = []

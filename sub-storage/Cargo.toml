@@ -27,6 +27,7 @@ hex = "0.4.2"
 frame-system = { path = "../../substrate/frame/system" }
 pallet-balances = { path = "../../substrate/frame/balances" }
 pallet-staking = { path = "../../substrate/frame/staking" }
+pallet-proxy = { path = "../../substrate/frame/proxy" }
 
 [features]
 default = []

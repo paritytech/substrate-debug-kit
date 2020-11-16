@@ -1695,6 +1695,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-proxy"
+version = "2.0.1"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-session"
 version = "2.0.0"
 dependencies = [
@@ -3058,6 +3072,7 @@ dependencies = [
  "jsonrpsee",
  "pallet-balances",
  "pallet-identity",
+ "pallet-proxy",
  "pallet-staking",
  "parity-scale-codec",
  "sp-core",
