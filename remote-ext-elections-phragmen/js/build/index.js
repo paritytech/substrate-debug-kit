@@ -19,6 +19,43 @@ const console_1 = require("console");
 const fs_1 = require("fs");
 const util_crypto_1 = require("@polkadot/util-crypto");
 const util_1 = require("util");
+const api_2 = require("@polkadot/api");
+function dryRun(api) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const ALICE = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
+        const BOB = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty";
+        const CHARLIE = "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y";
+        let treasuryAccount = new Uint8Array(32);
+        let modulePrefix = new Uint8Array(new util_1.TextEncoder().encode("modl"));
+        treasuryAccount.set(modulePrefix);
+        treasuryAccount.set(api.consts.treasury.moduleId.toU8a(), modulePrefix.length);
+        let TREASURY = api.createType('AccountId', treasuryAccount).toHuman();
+        const transfers = [
+            api.tx.balances.forceTransfer(TREASURY, ALICE, 1000),
+            api.tx.balances.forceTransfer(TREASURY, BOB, 1000),
+            api.tx.balances.forceTransfer(TREASURY, CHARLIE, 1000),
+        ];
+        let tx = api.tx.utility.batch(transfers);
+        console.log("transaction:", tx.toHuman());
+        console.log("hex: ", tx.method.toHex());
+        console.log("hash:", tx.method.hash.toHex());
+    });
+}
+function submitPreImage(api, hex) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const keyring = new api_2.Keyring({ type: 'sr25519' });
+        const SENDER = keyring.addFromUri('//Alice');
+        const _ = api.tx.democracy.noteImminentPreimage(hex).signAndSend(SENDER, (result) => {
+            console.log(`Current status is ${result.status}`);
+            if (result.status.isInBlock) {
+                console.log(`Transaction included at blockHash ${result.status.asInBlock}`);
+            }
+            else if (result.status.isFinalized) {
+                console.log(`Transaction finalized at blockHash ${result.status.asFinalized}`);
+            }
+        });
+    });
+}
 function recordedReserved(whos, api) {
     return __awaiter(this, void 0, void 0, function* () {
         let democracyDepositsOf = yield api.query.democracy.depositOf.entries();
@@ -518,8 +555,8 @@ function buildRefundTx(chain, slashMap, api) {
     }
     let tx = api.tx.utility.batch(transfers);
     console.log("transaction:", tx.toHuman());
-    console.log("hex: ", tx.toHex());
-    console.log("hash:", util_crypto_1.blake2AsHex(tx.toU8a(), 256));
+    console.log("hex: ", tx.method.toHex());
+    console.log("hash:", tx.method.hash.toHex());
     console.log("sum: ", api.createType('Balance', sum).toHuman());
 }
 (() => __awaiter(void 0, void 0, void 0, function* () {
@@ -527,17 +564,17 @@ function buildRefundTx(chain, slashMap, api) {
     const api = yield api_1.ApiPromise.create({ provider });
     const chain = "kusama";
     // -- scrape and create a new cache election json file
-    // unlinkSync(`elections.${chain}.json`)
-    // let elections = await findElections(api, chain);
-    // writeFileSync(`elections.${chain}.json`, JSON.stringify(elections))
+    fs_1.unlinkSync(`elections.${chain}.json`);
+    let elections = yield findElections(api, chain);
+    fs_1.writeFileSync(`elections.${chain}.json`, JSON.stringify(elections));
     // -- use cached file
-    let elections = JSON.parse(fs_1.readFileSync(`elections.${chain}.json`).toString());
-    for (let i = 0; i < elections.length; i++) {
-        elections[i].deposits = elections[i].deposits.map(x => new bn_js_1.default(`${x}`, 'hex'));
-        elections[i].unreserve = elections[i].unreserve.map(({ who, amount }) => {
-            return { who, amount: new bn_js_1.default(`${amount}`, 'hex') };
-        });
-    }
+    // let elections: ElectionBlock[] = JSON.parse(readFileSync(`elections.${chain}.json`).toString())
+    // for (let i = 0; i < elections.length; i++) {
+    // 	elections[i].deposits = elections[i].deposits.map(x => new BN(`${x}`, 'hex'))
+    // 	elections[i].unreserve = elections[i].unreserve.map( ({ who, amount }) => {
+    // 		return { who, amount: new BN(`${amount}`, 'hex') }
+    // 	})
+    // }
     let slashMap = yield calculateRefund(elections, api);
     yield parseCSVSimple(api, slashMap);
     buildRefundTx(chain, slashMap, api);

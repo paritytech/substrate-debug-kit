@@ -5,12 +5,47 @@ import { ITuple } from "@polkadot/types/types";
 import { Vec } from "@polkadot/types/codec";
 import { BalanceOf, ProxyDefinition, AccountId, BlockHash, } from "@polkadot/types/interfaces/";
 import request, { head, post } from "request-promise";
-import { Hash } from "crypto";
 import { assert } from "console";
 import { writeFileSync, readFileSync, unlinkSync } from 'fs'
 import { blake2AsHex, xxhashAsHex, } from "@polkadot/util-crypto";
-import { SSL_OP_ALL } from "constants";
 import { TextEncoder } from "util";
+import { Keyring } from '@polkadot/api';
+
+async function dryRun(api: ApiPromise) {
+	const ALICE = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+	const BOB = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
+	const CHARLIE = "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y"
+
+	let treasuryAccount = new Uint8Array(32);
+	let modulePrefix = new Uint8Array(new TextEncoder().encode("modl"))
+	treasuryAccount.set(modulePrefix)
+	treasuryAccount.set(api.consts.treasury.moduleId.toU8a(), modulePrefix.length)
+	let TREASURY = api.createType('AccountId', treasuryAccount).toHuman()
+
+	const transfers = [
+		api.tx.balances.forceTransfer(TREASURY, ALICE, 1000),
+		api.tx.balances.forceTransfer(TREASURY, BOB, 1000),
+		api.tx.balances.forceTransfer(TREASURY, CHARLIE, 1000),
+	];
+
+	let tx = api.tx.utility.batch(transfers)
+	console.log("transaction:", tx.toHuman())
+	console.log("hex: ", tx.method.toHex())
+	console.log("hash:", tx.method.hash.toHex())
+}
+
+async function submitPreImage(api: ApiPromise, hex: Uint8Array) {
+	const keyring = new Keyring({ type: 'sr25519' });
+	const SENDER = keyring.addFromUri('//Alice')
+	const _ = api.tx.democracy.noteImminentPreimage(hex).signAndSend(SENDER, (result) => {
+		console.log(`Current status is ${result.status}`);
+		if (result.status.isInBlock) {
+			console.log(`Transaction included at blockHash ${result.status.asInBlock}`);
+		} else if (result.status.isFinalized) {
+			console.log(`Transaction finalized at blockHash ${result.status.asFinalized}`);
+		}
+	})
+}
 
 async function recordedReserved(whos: string[], api: ApiPromise): Promise<[string, Array<[string, BN]>, BN, BN][]> {
 	let democracyDepositsOf = await api.query.democracy.depositOf.entries();
@@ -583,8 +618,8 @@ function buildRefundTx(chain: string, slashMap: Map<string, BN>, api: ApiPromise
 	}
 	let tx = api.tx.utility.batch(transfers);
 	console.log("transaction:", tx.toHuman())
-	console.log("hex: ", tx.toHex())
-	console.log("hash:", blake2AsHex(tx.toU8a(), 256))
+	console.log("hex: ", tx.method.toHex())
+	console.log("hash:", tx.method.hash.toHex())
 	console.log("sum: ", api.createType('Balance', sum).toHuman())
 }
 
@@ -594,18 +629,18 @@ function buildRefundTx(chain: string, slashMap: Map<string, BN>, api: ApiPromise
 	const chain = "kusama"
 
 	// -- scrape and create a new cache election json file
-	// unlinkSync(`elections.${chain}.json`)
-	// let elections = await findElections(api, chain);
-	// writeFileSync(`elections.${chain}.json`, JSON.stringify(elections))
+	unlinkSync(`elections.${chain}.json`)
+	let elections = await findElections(api, chain);
+	writeFileSync(`elections.${chain}.json`, JSON.stringify(elections))
 
 	// -- use cached file
-	let elections: ElectionBlock[] = JSON.parse(readFileSync(`elections.${chain}.json`).toString())
-	for (let i = 0; i < elections.length; i++) {
-		elections[i].deposits = elections[i].deposits.map(x => new BN(`${x}`, 'hex'))
-		elections[i].unreserve = elections[i].unreserve.map( ({ who, amount }) => {
-			return { who, amount: new BN(`${amount}`, 'hex') }
-		})
-	}
+	// let elections: ElectionBlock[] = JSON.parse(readFileSync(`elections.${chain}.json`).toString())
+	// for (let i = 0; i < elections.length; i++) {
+	// 	elections[i].deposits = elections[i].deposits.map(x => new BN(`${x}`, 'hex'))
+	// 	elections[i].unreserve = elections[i].unreserve.map( ({ who, amount }) => {
+	// 		return { who, amount: new BN(`${amount}`, 'hex') }
+	// 	})
+	// }
 
 	let slashMap = await calculateRefund(elections, api);
 	await parseCSVSimple(api, slashMap)
