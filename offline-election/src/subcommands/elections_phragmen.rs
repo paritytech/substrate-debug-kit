@@ -114,9 +114,10 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 		assignments,
 	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
 		count,
+		0,
 		candidates,
 		all_voters.clone(),
-		None,
+		// None,
 	)
 	.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
@@ -132,7 +133,7 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 
 	t_start!(build_support_map_run);
 	let supports =
-		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).unwrap();
+		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).0;
 	t_stop!(build_support_map_run);
 
 	if iterations > 0 {
@@ -147,7 +148,7 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 			i + 1,
 			storage::helpers::get_identity::<AccountId, Balance>(s.0.as_ref(), &client, at).await,
 			s.0,
-			Currency(supports.get(&s.0).unwrap().total),
+			Currency::from(supports.get(&s.0).unwrap().total),
 		);
 
 		if verbosity >= 1 {
@@ -158,7 +159,7 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 					"	{}#{} [amount = {:?}] {:?}",
 					if s.0 == o.0 { "*" } else { "" },
 					i,
-					Currency(o.1),
+					Currency::from(o.1),
 					o.0
 				);
 			});

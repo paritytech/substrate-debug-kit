@@ -1,25 +1,21 @@
 use assert_cmd::Command;
 
-#[cfg(feature = "remote-test-kusama")]
-const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
-#[cfg(feature = "remote-test-polkadot")]
-const TEST_URI: &'static str = "wss://rpc.polkadot.io/";
-#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
-const TEST_URI: &'static str = "ws://localhost:9944";
-
 #[test]
+#[ignore = "requires unsafe RPC"]
 fn staking_works() {
 	let mut cmd = Command::cargo_bin("offline-election").unwrap();
 	cmd.args(&["--uri", TEST_URI, "staking"]).unwrap();
 }
 
 #[test]
+#[ignore = "requires unsafe RPC"]
 fn council_works() {
 	let mut cmd = Command::cargo_bin("offline-election").unwrap();
 	cmd.args(&["--uri", TEST_URI, "council"]).unwrap();
 }
 
 #[test]
+#[ignore = "requires unsafe RPC"]
 fn dangling_works() {
 	let mut cmd = Command::cargo_bin("offline-election").unwrap();
 	cmd.args(&["--uri", TEST_URI, "dangling-nominators"])
@@ -27,6 +23,7 @@ fn dangling_works() {
 }
 
 #[test]
+#[ignore = "requires unsafe RPC"]
 fn nominator_check_works() {
 	let mut cmd = Command::cargo_bin("offline-election").unwrap();
 	let transport =

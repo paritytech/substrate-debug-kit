@@ -22,11 +22,9 @@
 // whatever node you are connecting to. Polkadot, substrate etc.
 pub use primitives::{AccountId, Balance, BlockNumber, Hash};
 
-use atomic_refcell::AtomicRefCell as RefCell;
 use jsonrpsee::Client;
-use separator::Separatable;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
-use std::{convert::TryInto, fmt, path::PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 use sub_storage as storage;
 
@@ -40,53 +38,7 @@ pub mod subcommands;
 /// Default logging target.
 pub const LOG_TARGET: &'static str = "offline-election";
 
-/// Decimal points of the currency based on the network.
-pub static DECIMAL_POINTS: RefCell<Balance> = RefCell::new(1_000_000_000_000);
-
-/// Name of the currency token based on the network.
-pub static TOKEN_NAME: RefCell<&'static str> = RefCell::new("KSM");
-
-/// Wrapper to pretty-print currency token.
-// TODO: move to another crate.
-struct Currency(Balance);
-
-impl fmt::Debug for Currency {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let num: u128 = self.0.try_into().unwrap();
-		write!(
-			f,
-			"{},{:0>3}{} ({})",
-			self.0 / *DECIMAL_POINTS.borrow(),
-			self.0 % *DECIMAL_POINTS.borrow() / (*DECIMAL_POINTS.borrow() / 1000),
-			*TOKEN_NAME.borrow(),
-			num.separated_string()
-		)
-	}
-}
-
-impl fmt::Display for Currency {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let num: u128 = self.0.try_into().unwrap();
-		write!(f, "{}", num.separated_string())
-	}
-}
-
-/// A wrapper type for account id that can be parsed from the command line.
-// TODO: this is no longer needed: https://github.com/paritytech/substrate/pull/6621
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ParsedAccountId(sp_core::crypto::AccountId32);
-
-impl std::str::FromStr for ParsedAccountId {
-	type Err = &'static str;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		use sp_core::crypto::Ss58Codec;
-		// TODO: finish this: accept also hex string if this fails.
-		<sp_core::crypto::AccountId32 as Ss58Codec>::from_ss58check(s)
-			.map_err(|_| "invalid ss58 address")
-			.map(|acc| Self(acc))
-	}
-}
+type Currency = sub_tokens::dynamic::DynamicToken;
 
 /// Offline elections scripts.
 ///
@@ -151,13 +103,13 @@ pub enum SubCommands {
 	NominatorCheck {
 		/// The nominator's address. Both hex and ss58 encoding are acceptable.
 		#[structopt(long)]
-		who: ParsedAccountId,
+		who: AccountId,
 	},
 	/// The general checkup of a validators.
 	ValidatorCheck {
 		/// The validator's address. Both hex and ss58 encoding are acceptable.
 		#[structopt(long)]
-		who: ParsedAccountId,
+		who: AccountId,
 	},
 }
 
@@ -233,8 +185,8 @@ async fn main() -> () {
 	// setup address format and currency based on address format.
 	set_default_ss58_version(address_format);
 	if address_format.eq(&Ss58AddressFormat::PolkadotAccount) {
-		*TOKEN_NAME.borrow_mut() = "DOT";
-		*DECIMAL_POINTS.borrow_mut() = 10_000_000_000;
+		sub_tokens::dynamic::set_name(&"DOT");
+		sub_tokens::dynamic::set_decimal_points(10_000_000_000);
 	}
 
 	// set total issuance
@@ -244,7 +196,7 @@ async fn main() -> () {
 	log::info!(
 		target: LOG_TARGET,
 		"total_issuance = {:?}",
-		Currency(network::issuance::get())
+		Currency::from(network::issuance::get())
 	);
 
 	match opt.clone().cmd {
@@ -259,10 +211,10 @@ async fn main() -> () {
 		}
 		SubCommands::CommandCenter { .. } => unimplemented!(),
 		SubCommands::NominatorCheck { who } => {
-			subcommands::nominator_check::run(&client, opt.clone(), who.0).await
+			subcommands::nominator_check::run(&client, opt.clone(), who).await
 		}
 		SubCommands::ValidatorCheck { who } => {
-			subcommands::validator_check::run(&client, opt.clone(), who.0).await
+			subcommands::validator_check::run(&client, opt.clone(), who).await
 		}
 	};
 }

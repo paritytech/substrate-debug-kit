@@ -553,19 +553,19 @@ function buildRefundTx(chain, slashMap, api) {
 (() => __awaiter(void 0, void 0, void 0, function* () {
     const provider = new api_1.WsProvider(process.argv[2]);
     const api = yield api_1.ApiPromise.create({ provider });
-    const chain = "polkadot";
+    const chain = "kusama";
     // -- scrape and create a new cache election json file
     // unlinkSync(`elections.${chain}.json`)
-    let elections = yield findElections(api, chain);
-    fs_1.writeFileSync(`elections.${chain}.json`, JSON.stringify(elections));
+    // let elections = await findElections(api, chain);
+    // writeFileSync(`elections.${chain}.json`, JSON.stringify(elections))
     // -- use cached file
-    // let elections: ElectionBlock[] = JSON.parse(readFileSync(`elections.${chain}.json`).toString())
-    // for (let i = 0; i < elections.length; i++) {
-    // 	elections[i].deposits = elections[i].deposits.map(x => new BN(`${x}`, 'hex'))
-    // 	elections[i].unreserve = elections[i].unreserve.map( ({ who, amount }) => {
-    // 		return { who, amount: new BN(`${amount}`, 'hex') }
-    // 	})
-    // }
+    let elections = JSON.parse(fs_1.readFileSync(`elections.${chain}.json`).toString());
+    for (let i = 0; i < elections.length; i++) {
+        elections[i].deposits = elections[i].deposits.map(x => new bn_js_1.default(`${x}`, 'hex'));
+        elections[i].unreserve = elections[i].unreserve.map(({ who, amount }) => {
+            return { who, amount: new bn_js_1.default(`${amount}`, 'hex') };
+        });
+    }
     let slashMap = yield calculateRefund(elections, api);
     yield parseCSVSimple(api, slashMap);
     const { preImage, hash } = yield buildRefundTx(chain, slashMap, api);

@@ -265,6 +265,14 @@ mod tests {
 	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
 	const TEST_URI: &'static str = "ws://localhost:9944";
 
+	// treasury accounts of each network
+	#[cfg(feature = "remote-test-kusama")]
+	const ACCOUNT: &'static str = "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29";
+	#[cfg(feature = "remote-test-polkadot")]
+	const ACCOUNT: &'static str = "13UVJyLnbVp9RBZYFwFGyDvVd1y27Tt8tkntv6Q7JVPhFsTB";
+	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
+	const ACCOUNT: &'static str = "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29";
+
 	async fn test_client() -> Client {
 		let transport = WsTransportClient::new(TEST_URI)
 			.await
@@ -287,9 +295,11 @@ mod tests {
 		let at = block_on(get_head(&client));
 		// web3 foundation technical account in kusama.
 		let account =
-			hex_literal::hex!["8a0e42d190d3ecaebf11d3834f4b992e0fab469e6bf17056d402cb172b827a22"];
+			<sp_runtime::AccountId32 as sp_core::crypto::Ss58Codec>::from_ss58check(ACCOUNT)
+				.unwrap();
+
 		let data = block_on(read::<AccountInfo<Nonce, AccountData<Balance>>>(
-			map_key::<frame_support::Blake2_128Concat>(b"System", b"Account", &account),
+			map_key::<frame_support::Blake2_128Concat>(b"System", b"Account", account.as_ref()),
 			&client,
 			at,
 		));
@@ -344,23 +354,5 @@ mod tests {
 			at
 		))
 		.is_none());
-	}
-
-	#[test]
-	fn dummy() {
-		let client = block_on(test_client());
-		let at: Hash =
-			hex_literal::hex!["715dbf4012cdca810bcb2dca507d856e3fa719f3cf072058a2be378fd3aedeeb"]
-				.into();
-
-		let all_voters = block_on(enumerate_map::<
-			sp_core::crypto::AccountId32,
-			(Balance, Vec<sp_core::crypto::AccountId32>),
-		>(b"PhragmenElection", b"Voting", &client, at))
-		.unwrap();
-
-		all_voters.iter().for_each(|(x, _)| println!("{:?}", x.0));
-
-		assert!(false);
 	}
 }

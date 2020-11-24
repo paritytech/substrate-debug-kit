@@ -67,7 +67,7 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 	for t in nomination.targets.iter() {
 		let ident = helpers::get_identity::<AccountId, Balance>(t.as_ref(), client, at).await;
 		if let Some(active) = active_edges.iter().find(|e| e.0 == *t) {
-			let val = crate::Currency(active.1);
+			let val = crate::Currency::from(active.1);
 			let index = active.2;
 			println!(
 				"\t✅ Active {:?} ({}) / value: {:?} / index: {:?}",
@@ -84,7 +84,7 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 
 	println!(
 		"💰 total bonded = {:?} // Active = {:?}",
-		Currency(total_bonded),
-		Currency(active_bonded)
+		Currency::from(total_bonded),
+		Currency::from(active_bonded)
 	);
 }

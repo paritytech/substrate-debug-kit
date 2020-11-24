@@ -254,11 +254,6 @@ mod tests_dummy {
 
 	type Header = sp_runtime::generic::Header<u32, BlakeTwo256>;
 
-	#[cfg(feature = "remote-test-kusama")]
-	const TEST_URI: &'static str = "wss://kusama-rpc.polkadot.io/";
-	#[cfg(feature = "remote-test-polkadot")]
-	const TEST_URI: &'static str = "wss://rpc.polkadot.io/";
-	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
 	const TEST_URI: &'static str = "ws://localhost:9944";
 
 	macro_rules! init_log {
@@ -285,7 +280,7 @@ mod tests_dummy {
 		type BlockNumber = u32;
 		type Hash = H256;
 		type Hashing = BlakeTwo256;
-		type AccountId = u64;
+		type AccountId = sp_runtime::AccountId32;
 		type Lookup = IdentityLookup<Self::AccountId>;
 		type Header = Header;
 		type Event = ();
@@ -306,12 +301,14 @@ mod tests_dummy {
 	}
 
 	#[test]
-	fn test_runtime_works() {
+	#[ignore = "can only work if a local node is available."]
+	fn test_runtime_works_kusama() {
 		init_log!();
-		let hash: Hash =
-			hex!["f9a4ce984129569f63edc01b1c13374779f9384f1befd39931ffdcc83acf63a7"].into();
-		let parent: Hash =
-			hex!["540922e96a8fcaf945ed23c6f09c3e189bd88504ec945cc2171deaebeaf2f37e"].into();
+		let (hash, parent) = (
+			hex!["7813658eb560e0c8620d73356676d1cc160d3f3c4025a178f368dc506bbd3e3c"].into(),
+			hex!["989e0785569561ce174507121a9c85d34f72e07cf3a1bfb95a8a2c10ba0e2847"].into(),
+		);
+
 		Builder::new()
 			.uri(TEST_URI.into())
 			.at(hash)
@@ -319,27 +316,9 @@ mod tests_dummy {
 			.build()
 			.execute_with(|| {
 				assert_eq!(
-					// note: the hash corresponds to 3098546. We can check only the parent.
-					// https://polkascan.io/kusama/block/3098546
 					<frame_system::Module<TestRuntime>>::block_hash(3098545u32),
 					parent,
 				)
 			});
 	}
-
-	// This is an example of how this would work with a real runtime.
-	// Note that in this case the version of `pallet_staking` need to be the same as the one used by
-	// your runtime, and the same as the sp-io used by this crate.
-	// #[test]
-	// fn kusama_runtime_works() {
-	// 	use kusama_runtime::Runtime;
-	// 	init_log!();
-	// 	let hash: Hash =
-	// 		hex!["f9a4ce984129569f63edc01b1c13374779f9384f1befd39931ffdcc83acf63a7"].into();
-	// 	Builder::new()
-	// 		.at(hash)
-	// 		.module("Staking")
-	// 		.build()
-	// 		.execute_with(|| assert_eq!(<pallet_staking::Module<Runtime>>::validator_count(), 400));
-	// }
 }

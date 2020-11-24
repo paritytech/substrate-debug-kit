@@ -21,7 +21,7 @@ json = "0.12.4"
 reqwest = { version = "0.10.8", features = ["blocking"] }
 
 remote-externalities = { path = "../remote-externalities" }
-tokens = { path = "../tokens" }
+sub-tokens = { path = "../sub-tokens" }
 
 sp-runtime = { path = "../../substrate/primitives/runtime" }
 sp-core = { path = "../../substrate/primitives/core" }

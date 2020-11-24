@@ -200,13 +200,14 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		assignments,
 	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
 		count,
+		0,
 		candidates.clone(),
 		all_voters
 			.iter()
 			.cloned()
 			.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
 			.collect::<Vec<_>>(),
-		Some((iterations, 0)),
+		// Some((iterations, 0)),
 	)
 	.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
@@ -223,8 +224,13 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 
 	t_start!(build_support_map_run);
 	let mut supports =
-		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).unwrap();
+		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).0;
 	t_stop!(build_support_map_run);
+
+	// TODO: remove once balancing is merged into set-phragmen
+	t_start!(balancing);
+	sp_npos_elections::balance_solution(&mut staked_assignments, &mut supports, 0, iterations);
+	t_stop!(balancing);
 
 	let initial_score = evaluate_support(&supports);
 
@@ -234,29 +240,12 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		t_stop!(reducing_solution);
 		// just to check that support has NOT changed
 		let support_after_reduce =
-			build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice())
-				.unwrap();
+			build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).0;
 		assert_supports_total_equal(&support_after_reduce, &supports);
 		supports = support_after_reduce;
 	}
 
 	let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
-
-	// only useful if we do check exposure.
-	let mut mismatch = 0usize;
-	let era = match 0 {
-		0 => get_current_era(client, at).await,
-		era @ _ => era,
-	};
-
-	// TODO: remove this or fix it.
-	if false {
-		log::debug!(
-			target: LOG_TARGET,
-			"checking exposures against era index {}",
-			era
-		);
-	}
 
 	log::info!(target: LOG_TARGET, "💸 Winner Validators:");
 	for (i, (s, _)) in winners.iter().enumerate() {
@@ -273,9 +262,9 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 			i + 1,
 			storage::helpers::get_identity::<AccountId, Balance>(s.as_ref(), &client, at).await,
 			s,
-			Currency(support.total),
+			Currency::from(support.total),
 			other_count,
-			Currency(self_stake[0].1),
+			Currency::from(self_stake[0].1),
 		);
 
 		if verbosity >= 1 {
@@ -285,7 +274,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 					"    {}#{} [amount = {:?}] {:?}",
 					if *s == o.0 { "*" } else { "" },
 					i + 1,
-					Currency(o.1),
+					Currency::from(o.1),
 					o.0
 				);
 				nominator_info
@@ -295,27 +284,6 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 			});
 			println!("");
 		}
-
-		if false {
-			let expo = exposure_of(&s, era, &client, at).await;
-			if support.total != expo.total {
-				mismatch += 1;
-				log::warn!(
-					target: LOG_TARGET,
-					"exposure mismatch with on-chain data, expo.total = {:?} - support.total = {:?} diff = {}",
-					expo.total,
-					support.total,
-					if support.total > expo.total {
-						format!("+{}", Currency(support.total - expo.total))
-					} else {
-						format!("-{}", Currency(expo.total - support.total))
-					}
-				);
-			}
-		}
-	}
-	if mismatch > 0 {
-		log::error!("{} exposure mismatches found.", mismatch);
 	}
 
 	if verbosity >= 2 {
@@ -328,12 +296,12 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 				"#{} {:?} // active_stake = {:?}",
 				counter,
 				nominator,
-				Currency(staker_info.stake),
+				Currency::from(staker_info.stake),
 			);
 			println!("  Distributions:");
 			info.iter().enumerate().for_each(|(i, (c, s))| {
 				sum += *s;
-				println!("    #{} {:?} => {:?}", i, c, Currency(*s));
+				println!("    #{} {:?} => {:?}", i, c, Currency::from(*s));
 			});
 			counter += 1;
 			let diff = sum.max(staker_info.stake) - sum.min(staker_info.stake);
@@ -362,7 +330,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		"solution score {:?}",
 		initial_score
 			.iter()
-			.map(|n| format!("{:?}", Currency(*n)))
+			.map(|n| format!("{:?}", Currency::from(*n)))
 			.collect::<Vec<_>>(),
 	);
 	log::info!(

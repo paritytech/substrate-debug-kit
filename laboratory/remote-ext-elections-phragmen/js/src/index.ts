@@ -618,7 +618,7 @@ async function buildRefundTx(chain: string, slashMap: Map<string, BN>, api: ApiP
 (async () => {
 	const provider = new WsProvider(process.argv[2])
 	const api = await ApiPromise.create( { provider })
-	const chain = "polkadot"
+	const chain = "kusama"
 
 	// -- scrape and create a new cache election json file
 	// unlinkSync(`elections.${chain}.json`)
