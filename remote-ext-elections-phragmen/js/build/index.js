@@ -20,40 +20,28 @@ const fs_1 = require("fs");
 const util_crypto_1 = require("@polkadot/util-crypto");
 const util_1 = require("util");
 const api_2 = require("@polkadot/api");
-function dryRun(api) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const ALICE = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
-        const BOB = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty";
-        const CHARLIE = "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y";
-        let treasuryAccount = new Uint8Array(32);
-        let modulePrefix = new Uint8Array(new util_1.TextEncoder().encode("modl"));
-        treasuryAccount.set(modulePrefix);
-        treasuryAccount.set(api.consts.treasury.moduleId.toU8a(), modulePrefix.length);
-        let TREASURY = api.createType('AccountId', treasuryAccount).toHuman();
-        const transfers = [
-            api.tx.balances.forceTransfer(TREASURY, ALICE, 1000),
-            api.tx.balances.forceTransfer(TREASURY, BOB, 1000),
-            api.tx.balances.forceTransfer(TREASURY, CHARLIE, 1000),
-        ];
-        let tx = api.tx.utility.batch(transfers);
-        console.log("transaction:", tx.toHuman());
-        console.log("hex: ", tx.method.toHex());
-        console.log("hash:", tx.method.hash.toHex());
-    });
-}
-function submitPreImage(api, hex) {
+function submitPreImage(api, preImage, dryRun) {
     return __awaiter(this, void 0, void 0, function* () {
         const keyring = new api_2.Keyring({ type: 'sr25519' });
         const SENDER = keyring.addFromUri('//Alice');
-        const _ = api.tx.democracy.noteImminentPreimage(hex).signAndSend(SENDER, (result) => {
-            console.log(`Current status is ${result.status}`);
-            if (result.status.isInBlock) {
-                console.log(`Transaction included at blockHash ${result.status.asInBlock}`);
-            }
-            else if (result.status.isFinalized) {
-                console.log(`Transaction finalized at blockHash ${result.status.asFinalized}`);
-            }
-        });
+        if (dryRun) {
+            const tx = api.tx.democracy.notePreimage(preImage);
+            const info = yield api.rpc.payment.queryInfo(tx.toHex());
+            const dryRun = yield api.rpc.system.dryRun(tx.toHex());
+            console.log(info.toHuman());
+            console.log(dryRun.toHuman());
+        }
+        else {
+            const _ = api.tx.democracy.notePreimage(preImage).signAndSend(SENDER, (result) => {
+                console.log(`Current status is ${result.status}`);
+                if (result.status.isInBlock) {
+                    console.log(`Transaction included at blockHash ${result.status.asInBlock}`);
+                }
+                else if (result.status.isFinalized) {
+                    console.log(`Transaction finalized at blockHash ${result.status.asFinalized}`);
+                }
+            });
+        }
     });
 }
 function recordedReserved(whos, api) {
@@ -532,39 +520,42 @@ function getCurrentRole(who, api) {
     });
 }
 function buildRefundTx(chain, slashMap, api) {
-    let treasuryAccount = new Uint8Array(32);
-    let modulePrefix = new Uint8Array(new util_1.TextEncoder().encode("modl"));
-    treasuryAccount.set(modulePrefix);
-    treasuryAccount.set(api.consts.treasury.moduleId.toU8a(), modulePrefix.length);
-    let treasury = api.createType('AccountId', treasuryAccount);
-    // verified account kusama: F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29
-    // verified account polkadot: 13UVJyLnbVp9RBZYFwFGyDvVd1y27Tt8tkntv6Q7JVPhFsTB
-    if (chain == "kusama") {
-        console_1.assert(treasury.toHuman().toString() === "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29");
-    }
-    else {
-        console_1.assert(treasury.toHuman().toString() === "13UVJyLnbVp9RBZYFwFGyDvVd1y27Tt8tkntv6Q7JVPhFsTB");
-    }
-    let sum = new bn_js_1.default(0);
-    let transfers = [];
-    for (let [who, amount] of slashMap) {
-        let tx = api.tx.balances.forceTransfer(treasury, who, amount);
-        sum = sum.add(amount);
-        console.log(tx.toHuman());
-        transfers.push(tx);
-    }
-    let tx = api.tx.utility.batch(transfers);
-    console.log("transaction:", tx.toHuman());
-    console.log("hex: ", tx.method.toHex());
-    console.log("hash:", tx.method.hash.toHex());
-    console.log("sum: ", api.createType('Balance', sum).toHuman());
+    return __awaiter(this, void 0, void 0, function* () {
+        let treasuryAccount = new Uint8Array(32);
+        let modulePrefix = new Uint8Array(new util_1.TextEncoder().encode("modl"));
+        treasuryAccount.set(modulePrefix);
+        treasuryAccount.set(api.consts.treasury.moduleId.toU8a(), modulePrefix.length);
+        let treasury = api.createType('AccountId', treasuryAccount);
+        // verified account kusama: F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29
+        // verified account polkadot: 13UVJyLnbVp9RBZYFwFGyDvVd1y27Tt8tkntv6Q7JVPhFsTB
+        if (chain == "kusama") {
+            console_1.assert(treasury.toHuman().toString() === "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29");
+        }
+        else {
+            console_1.assert(treasury.toHuman().toString() === "13UVJyLnbVp9RBZYFwFGyDvVd1y27Tt8tkntv6Q7JVPhFsTB");
+        }
+        let sum = new bn_js_1.default(0);
+        let transfers = [];
+        for (let [who, amount] of slashMap) {
+            let tx = api.tx.balances.forceTransfer(treasury, who, amount);
+            sum = sum.add(amount);
+            console.log(tx.toHuman());
+            transfers.push(tx);
+        }
+        let tx = api.tx.utility.batch(transfers);
+        console.log("transaction:", tx.toHuman());
+        console.log("preimage: ", tx.method.toHex());
+        console.log("hash:", tx.method.hash.toHex());
+        console.log("sum: ", api.createType('Balance', sum).toHuman());
+        return { preImage: tx.method.toU8a(), hash: tx.meta.hash.toU8a() };
+    });
 }
 (() => __awaiter(void 0, void 0, void 0, function* () {
     const provider = new api_1.WsProvider(process.argv[2]);
     const api = yield api_1.ApiPromise.create({ provider });
-    const chain = "kusama";
+    const chain = "polkadot";
     // -- scrape and create a new cache election json file
-    fs_1.unlinkSync(`elections.${chain}.json`);
+    // unlinkSync(`elections.${chain}.json`)
     let elections = yield findElections(api, chain);
     fs_1.writeFileSync(`elections.${chain}.json`, JSON.stringify(elections));
     // -- use cached file
@@ -577,5 +568,6 @@ function buildRefundTx(chain, slashMap, api) {
     // }
     let slashMap = yield calculateRefund(elections, api);
     yield parseCSVSimple(api, slashMap);
-    buildRefundTx(chain, slashMap, api);
+    const { preImage, hash } = yield buildRefundTx(chain, slashMap, api);
+    yield submitPreImage(api, preImage, true);
 }))();
