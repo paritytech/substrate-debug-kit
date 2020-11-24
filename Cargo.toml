@@ -3,6 +3,7 @@
 members = [
 	"sub-du",
 	"sub-storage",
+	"sub-tokens",
 	"offline-election",
 	"remote-externalities",
 ]

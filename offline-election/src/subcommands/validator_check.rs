@@ -36,7 +36,7 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 			.find(|ie| ie.who == n)
 			.map(|ie| ie.value);
 		let is_dangling =
-			subcommands::dangling_nominators::is_dangling(&n, submitted_in, client, at).await;
+			subcommands::dangling_nominators::is_dangling(&who, submitted_in, client, at).await;
 		println!(
 			"\t Voted from [{:?}] || dangling: {} || exposed: {}",
 			n,
@@ -46,14 +46,14 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 				"✅ No".into()
 			},
 			if let Some(val) = is_exposed {
-				format!("💰 by {:?}", Currency(val))
+				format!("💰 by {:?}", Currency::from(val))
 			} else {
 				"∅".into()
 			},
 		)
 	}
 
-	println!("🤑 Total stake = {:?}", Currency(exposure.total));
+	println!("🤑 Total stake = {:?}", Currency::from(exposure.total));
 	let maybe_slashing_spans = subcommands::staking::slashing_span_of(&who, client, at).await;
 	if let Some(spans) = maybe_slashing_spans {
 		println!(

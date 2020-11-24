@@ -17,8 +17,8 @@ pub async fn run(client: &Client, config: Opt) {
 			"#{} [{}] [total: {:?} / others: {:?} / count: {}]- {:?}",
 			i + 1,
 			get_identity::<AccountId, Balance>(v.as_ref(), client, at).await,
-			Currency(expo.total),
-			Currency(expo.others.iter().map(|indie| indie.value).sum::<Balance>()),
+			Currency::from(expo.total),
+			Currency::from(expo.others.iter().map(|indie| indie.value).sum::<Balance>()),
 			expo.others.len(),
 			v
 		);
@@ -31,6 +31,6 @@ pub async fn run(client: &Client, config: Opt) {
 	log::info!(
 		target: LOG_TARGET,
 		"min-staker (score[0]) is {:?}",
-		Currency(min_stake)
+		Currency::from(min_stake)
 	);
 }

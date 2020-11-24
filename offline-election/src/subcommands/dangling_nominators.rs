@@ -1,6 +1,9 @@
-use crate::primitives::Hash;
-use crate::subcommands::staking::slashing_span_of;
-use crate::{primitives::AccountId, storage, Client, Opt, LOG_TARGET};
+use crate::{
+	primitives::{AccountId, Hash},
+	storage,
+	subcommands::staking::slashing_span_of,
+	Client, Opt, LOG_TARGET,
+};
 use pallet_staking::Nominations;
 
 /// Check if a vote submitted at the given era for this target is dangling or not.
@@ -11,7 +14,13 @@ pub async fn is_dangling(
 	at: Hash,
 ) -> bool {
 	let maybe_slashing_spans = slashing_span_of(&target, client, at).await;
-	!maybe_slashing_spans.map_or(true, |spans| submitted_in >= spans.last_nonzero_slash())
+	!maybe_slashing_spans.map_or(true, |spans| {
+		println!(
+			"spans.last_nonzero_slash() = {:?}",
+			spans.last_nonzero_slash()
+		);
+		submitted_in >= spans.last_nonzero_slash()
+	})
 }
 
 /// Main run function of the sub-command.

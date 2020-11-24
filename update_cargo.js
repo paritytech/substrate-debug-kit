@@ -3,14 +3,15 @@ const path = require('path')
 const dirs = ["remote-externalities", "offline-election", "sub-storage", "sub-du"]
 
 const VERSION_TYPE = {
-	EXACT: "2.0.0-rc6",
-	GIT: "master",
+	EXACT: "2.0.0",
+	BRANCH: "master",
+	COMMIT: "6687fa111e5efaef6c91ec840dc7fb92d4a72820",
 	LOCAL: "",
 }
 
 const SPECIAL_VERSIONS = {
-	"frame-metadata": "11.0.0-rc6",
-	"sp-externalities": "0.8.0-rc6",
+	"frame-metadata": "12.0.0",
+	"sp-externalities": "0.8.0",
 };
 
 function set_exact(package, version, with_optional) {
@@ -21,8 +22,12 @@ function set_exact(package, version, with_optional) {
 	return `${package} = { version = "${version}"${with_optional ? ", optional = true " : " "}}\n`
 }
 
-function set_git(package, branch, with_optional) {
+function set_branch(package, branch, with_optional) {
 	return `${package} = { git = "https://github.com/paritytech/substrate", branch = "${branch}"${with_optional ? ", optional = true " : " "}}\n`
+}
+
+function set_commit(package, commit, with_optional) {
+	return `${package} = { git = "https://github.com/paritytech/substrate", rev = "${commit}"${with_optional ? ", optional = true " : " "}}\n`
 }
 
 function set_local(package, folder, local_package, with_optional) {
@@ -38,8 +43,11 @@ function do_update(content, version) {
 				case VERSION_TYPE.EXACT :
 					output += set_exact(package, version, line.includes("optional"))
 					break
-				case VERSION_TYPE.GIT :
-					output += set_git(package, version, line.includes("optional"))
+				case VERSION_TYPE.BRANCH :
+					output += set_branch(package, version, line.includes("optional"))
+					break
+				case VERSION_TYPE.COMMIT :
+					output += set_commit(package, version, line.includes("optional"))
 					break
 				case VERSION_TYPE.LOCAL :
 					let primitive_package = package.split("-").slice(1).join("-")
@@ -52,8 +60,11 @@ function do_update(content, version) {
 				case VERSION_TYPE.EXACT :
 					output += set_exact(package, version, line.includes("optional"))
 					break
-				case VERSION_TYPE.GIT :
-					output += set_git(package, version, line.includes("optional"))
+				case VERSION_TYPE.BRANCH :
+					output += set_branch(package, version, line.includes("optional"))
+					break
+				case VERSION_TYPE.COMMIT :
+					output += set_commit(package, version, line.includes("optional"))
 					break
 				case VERSION_TYPE.LOCAL :
 					let frame_package = package.split("-").slice(1).join("-")
@@ -78,8 +89,11 @@ function main(version) {
 }
 
 switch(process.argv[2]) {
-	case "git":
-		main(VERSION_TYPE.GIT)
+	case "branch":
+		main(VERSION_TYPE.BRANCH)
+		break
+	case "commit":
+		main(VERSION_TYPE.COMMIT)
 		break
 	case "local":
 		main(VERSION_TYPE.LOCAL)

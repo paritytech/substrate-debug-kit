@@ -1,9 +1,10 @@
-use crate::primitives::{AccountId, Balance, Hash};
-use crate::{storage, Client};
+use crate::{
+	primitives::{AccountId, Balance, Hash},
+	storage, Client,
+};
 use atomic_refcell::AtomicRefCell as RefCell;
 use codec::Encode;
 use sp_runtime::traits::Convert;
-
 static ISSUANCE: RefCell<Balance> = RefCell::new(0);
 
 /// Deals with total issuance

@@ -2,11 +2,7 @@ use ansi_term::{Colour::*, Style};
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed, StorageEntryType};
 use separator::Separatable;
 use structopt::StructOpt;
-use sub_storage::get_head;
-use sub_storage::get_metadata;
-use sub_storage::unwrap_decoded;
-use sub_storage::Hash;
-use sub_storage::StorageKey;
+use sub_storage::{get_head, get_metadata, unwrap_decoded, Hash, StorageKey};
 
 const KB: usize = 1024;
 const MB: usize = KB * KB;
@@ -142,6 +138,17 @@ struct Opt {
 	/// If true, intermediate values will be printed.
 	#[structopt(long, short)]
 	progress: bool,
+
+	/// Weather to scrape all pairs or just the size of them.
+	///
+	/// If enabled, the command might take longer but then the number of keys in each map is also
+	/// scraped.
+	///
+	/// # Warning
+	///
+	/// This uses an unsafe RPC call and can only be used if the target node allows it.
+	#[structopt(long, short)]
+	scrape_pairs: bool,
 }
 
 #[async_std::main]
@@ -166,12 +173,9 @@ async fn main() -> () {
 	let at = opt.at.unwrap_or(head);
 	let runtime = sub_storage::get_runtime_version(&client, at).await;
 
-	log::info!(
-		target: LOG_TARGET,
+	println!(
 		"Scraping at block {:?} of {}({})",
-		at,
-		runtime.spec_name,
-		runtime.spec_version,
+		at, runtime.spec_name, runtime.spec_version,
 	);
 
 	let raw_metadata = get_metadata(&client, at).await.0;
@@ -179,7 +183,7 @@ async fn main() -> () {
 		.expect("Runtime Metadata failed to decode");
 	let metadata = prefixed_metadata.1;
 
-	if let RuntimeMetadata::V11(inner) = metadata {
+	if let RuntimeMetadata::V12(inner) = metadata {
 		let decode_modules = unwrap_decoded(inner.modules);
 		for module in decode_modules.into_iter() {
 			let name = unwrap_decoded(module.name);
@@ -204,16 +208,27 @@ async fn main() -> () {
 				let ty = storage_entry.ty;
 				let key_prefix =
 					sub_storage::module_prefix_raw(prefix.as_bytes(), storage_name.as_bytes());
-				let pairs =
-					sub_storage::get_pairs(StorageKey(key_prefix.clone()), &client, at).await;
-				let pairs = pairs
-					.into_iter()
-					.map(|(k, v)| (k.0, v.0))
-					.collect::<Vec<(Vec<u8>, Vec<u8>)>>();
 
-				let size = pairs.iter().fold(0, |acc, x| acc + x.1.len());
+				let (pairs, size) = if opt.scrape_pairs {
+					// this should be slower but gives more detail.
+					let pairs =
+						sub_storage::get_pairs(StorageKey(key_prefix.clone()), &client, at).await;
+					let pairs = pairs
+						.into_iter()
+						.map(|(k, v)| (k.0, v.0))
+						.collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+					let size = pairs.iter().fold(0, |acc, x| acc + x.1.len());
+					(pairs, size)
+				} else {
+					// This should be faster
+					let size = sub_storage::get_storage_size(StorageKey(key_prefix), &client, at)
+						.await
+						.unwrap_or_default() as usize;
+					let pairs: Vec<_> = vec![];
+					(pairs, size)
+				};
 
-				log::trace!(
+				log::debug!(
 					target: LOG_TARGET,
 					"{:?}::{:?} => count: {}, size: {} bytes",
 					name,
@@ -233,22 +248,17 @@ async fn main() -> () {
 			}
 			module_info.items.sort_by_key(|x| x.size);
 			module_info.items.reverse();
+			println!(
+				"Scraped module {}. Total size {}.",
+				module_info.name, module_info.size,
+			);
 			if opt.progress {
 				print!("{}", module_info);
 			}
-			log::debug!(
-				target: LOG_TARGET,
-				"Scraped module {}. Total size {}.",
-				module_info.name,
-				module_info.size,
-			);
 			modules.push(module_info);
 		}
 
-		log::info!(
-			target: LOG_TARGET,
-			"Scraping results done. Final sorted tree:"
-		);
+		println!("Scraping results done. Final sorted tree:");
 		modules.sort_by_key(|m| m.size);
 		modules.reverse();
 
@@ -258,6 +268,6 @@ async fn main() -> () {
 			print!("{}", m);
 		});
 	} else {
-		log::error!("Unsupported Metadata version");
+		panic!("Unsupported Metadata version");
 	}
 }

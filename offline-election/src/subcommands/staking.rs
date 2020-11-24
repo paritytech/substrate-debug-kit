@@ -6,12 +6,12 @@ use crate::{
 	storage, Client, Currency, Opt, StakingConfig, LOG_TARGET,
 };
 use codec::Encode;
-use pallet_staking::slashing::SlashingSpans;
-use pallet_staking::{EraIndex, Exposure, Nominations, StakingLedger, ValidatorPrefs};
+use pallet_staking::{
+	slashing::SlashingSpans, EraIndex, Exposure, Nominations, StakingLedger, ValidatorPrefs,
+};
 use sp_npos_elections::*;
 use sp_runtime::traits::Convert;
-use std::collections::BTreeMap;
-use std::convert::TryInto;
+use std::{collections::BTreeMap, convert::TryInto};
 
 const MODULE: &[u8] = b"Staking";
 
@@ -146,113 +146,6 @@ async fn get_validator_count(client: &Client, at: Hash) -> u32 {
 		.unwrap_or(50)
 }
 
-async fn create_snapshot_nominators(client: &Client, at: Hash) -> Vec<AccountId> {
-	storage::enumerate_map::<AccountId, Nominations<AccountId>>(MODULE, b"Nominators", client, at)
-		.await
-		.unwrap()
-		.iter()
-		.map(|(who, _)| who.clone())
-		.collect()
-}
-
-async fn prepare_offchain_submission(
-	count: usize,
-	min_count: usize,
-	candidates: Vec<AccountId>,
-	voters: Vec<(AccountId, Vec<AccountId>)>,
-	staker_infos: BTreeMap<AccountId, Staker>,
-	client: &Client,
-	at: Hash,
-) -> pallet_staking::CompactAssignments {
-	let slashable_balance = |who: &AccountId| -> Balance { staker_infos.get(who).unwrap().stake };
-	let slashable_balance_votes = |who: &AccountId| -> VoteWeight {
-		<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(
-			slashable_balance(who),
-		)
-	};
-
-	t_start!(prepare_solution);
-	let ElectionResult {
-		winners,
-		assignments,
-	} = seq_phragmen::<AccountId, pallet_staking::OffchainAccuracy>(
-		count,
-		min_count,
-		candidates,
-		voters
-			.iter()
-			.cloned()
-			.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
-			.collect::<Vec<_>>(),
-	)
-	.expect("Phragmen failed to elect.");
-
-	let mut snapshot_nominators = create_snapshot_nominators(&client, at).await;
-	let snapshot_validators = get_candidates(&client, at).await;
-	snapshot_nominators.extend(snapshot_validators.clone());
-
-	// all helper closures
-	let nominator_index = |a: &AccountId| -> Option<pallet_staking::NominatorIndex> {
-		snapshot_nominators
-			.iter()
-			.position(|x| x == a)
-			.and_then(|i| <usize as TryInto<pallet_staking::NominatorIndex>>::try_into(i).ok())
-	};
-	let validator_index = |a: &AccountId| -> Option<pallet_staking::ValidatorIndex> {
-		snapshot_validators
-			.iter()
-			.position(|x| x == a)
-			.and_then(|i| <usize as TryInto<pallet_staking::ValidatorIndex>>::try_into(i).ok())
-	};
-
-	// Clean winners.
-	let winners = winners
-		.into_iter()
-		.map(|(w, _)| w)
-		.collect::<Vec<AccountId>>();
-
-	// convert into absolute value and to obtain the reduced version.
-	let mut staked = assignment_ratio_to_staked(assignments, slashable_balance_votes);
-
-	reduce(&mut staked);
-
-	// Convert back to ratio assignment. This takes less space.
-	let low_accuracy_assignment = assignment_staked_to_ratio(staked);
-
-	let _score = {
-		let staked =
-			assignment_ratio_to_staked(low_accuracy_assignment.clone(), slashable_balance_votes);
-
-		let (support_map, _) =
-			build_support_map::<AccountId>(winners.as_slice(), staked.as_slice());
-		evaluate_support::<AccountId>(&support_map)
-	};
-
-	// compact encode the assignment.
-	let compact = pallet_staking::CompactAssignments::from_assignment(
-		low_accuracy_assignment,
-		nominator_index,
-		validator_index,
-	)
-	.unwrap();
-
-	// winners to index.
-	let _winners = winners
-		.into_iter()
-		.map(|w| {
-			snapshot_validators
-				.iter()
-				.position(|v| *v == w)
-				.unwrap()
-				.try_into()
-				.unwrap()
-		})
-		.collect::<Vec<pallet_staking::ValidatorIndex>>();
-	t_stop!(prepare_solution);
-
-	compact
-}
-
 /// Main run function of the sub-command.
 pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	let at = opt.at.unwrap();
@@ -314,6 +207,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 			.cloned()
 			.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
 			.collect::<Vec<_>>(),
+		// Some((iterations, 0)),
 	)
 	.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
@@ -329,65 +223,29 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	t_stop!(ratio_into_staked_run);
 
 	t_start!(build_support_map_run);
-	let (mut supports, _) =
-		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice());
+	let mut supports =
+		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).0;
 	t_stop!(build_support_map_run);
 
-	let mut initial_score = evaluate_support(&supports);
+	// TODO: remove once balancing is merged into set-phragmen
+	t_start!(balancing);
+	sp_npos_elections::balance_solution(&mut staked_assignments, &mut supports, 0, iterations);
+	t_stop!(balancing);
 
-	if iterations > 0 {
-		// prepare and run post-processing.
-		t_start!(equalize_post_processing);
-		let done = balance_solution(&mut staked_assignments, &mut supports, 0, iterations);
-		t_stop!(equalize_post_processing);
-		let improved_score = evaluate_support(&supports);
-		log::info!(
-			target: LOG_TARGET,
-			"Balanced the results for [{}/{}] iterations, improved slot stake by {:?}",
-			done,
-			iterations,
-			Currency(
-				improved_score[0]
-					.checked_sub(initial_score[0])
-					.unwrap_or_else(|| {
-						log::error!(
-							target: LOG_TARGET,
-							"Balancing has returned a set which has a lower slot stake. This is most likely a serious bug.",
-						);
-						0
-					})
-			),
-		);
-		initial_score = improved_score;
-	}
+	let initial_score = evaluate_support(&supports);
 
 	if reduce {
 		t_start!(reducing_solution);
 		sp_npos_elections::reduce(&mut staked_assignments);
 		t_stop!(reducing_solution);
 		// just to check that support has NOT changed
-		let (support_after_reduce, _) =
-			build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice());
+		let support_after_reduce =
+			build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).0;
 		assert_supports_total_equal(&support_after_reduce, &supports);
 		supports = support_after_reduce;
 	}
 
 	let mut nominator_info: BTreeMap<AccountId, Vec<(AccountId, Balance)>> = BTreeMap::new();
-
-	// only useful if we do check exposure.
-	let mut mismatch = 0usize;
-	let era = match 0 {
-		0 => get_current_era(client, at).await,
-		era @ _ => era,
-	};
-	// TODO: remove this or fix it.
-	if false {
-		log::debug!(
-			target: LOG_TARGET,
-			"checking exposures against era index {}",
-			era
-		);
-	}
 
 	log::info!(target: LOG_TARGET, "💸 Winner Validators:");
 	for (i, (s, _)) in winners.iter().enumerate() {
@@ -404,9 +262,9 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 			i + 1,
 			storage::helpers::get_identity::<AccountId, Balance>(s.as_ref(), &client, at).await,
 			s,
-			Currency(support.total),
+			Currency::from(support.total),
 			other_count,
-			Currency(self_stake[0].1),
+			Currency::from(self_stake[0].1),
 		);
 
 		if verbosity >= 1 {
@@ -416,7 +274,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 					"    {}#{} [amount = {:?}] {:?}",
 					if *s == o.0 { "*" } else { "" },
 					i + 1,
-					Currency(o.1),
+					Currency::from(o.1),
 					o.0
 				);
 				nominator_info
@@ -426,27 +284,6 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 			});
 			println!("");
 		}
-
-		if false {
-			let expo = exposure_of(&s, era, &client, at).await;
-			if support.total != expo.total {
-				mismatch += 1;
-				log::warn!(
-					target: LOG_TARGET,
-					"exposure mismatch with on-chain data, expo.total = {:?} - support.total = {:?} diff = {}",
-					expo.total,
-					support.total,
-					if support.total > expo.total {
-						format!("+{}", Currency(support.total - expo.total))
-					} else {
-						format!("-{}", Currency(expo.total - support.total))
-					}
-				);
-			}
-		}
-	}
-	if mismatch > 0 {
-		log::error!("{} exposure mismatches found.", mismatch);
 	}
 
 	if verbosity >= 2 {
@@ -459,12 +296,12 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 				"#{} {:?} // active_stake = {:?}",
 				counter,
 				nominator,
-				Currency(staker_info.stake),
+				Currency::from(staker_info.stake),
 			);
 			println!("  Distributions:");
 			info.iter().enumerate().for_each(|(i, (c, s))| {
 				sum += *s;
-				println!("    #{} {:?} => {:?}", i, c, Currency(*s));
+				println!("    #{} {:?} => {:?}", i, c, Currency::from(*s));
 			});
 			counter += 1;
 			let diff = sum.max(staker_info.stake) - sum.min(staker_info.stake);
@@ -477,17 +314,6 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 			println!("");
 		}
 	}
-
-	let compact = prepare_offchain_submission(
-		count,
-		0,
-		candidates.clone(),
-		all_voters.clone(),
-		staker_infos.clone(),
-		&client,
-		at,
-	)
-	.await;
 
 	log::info!(
 		target: LOG_TARGET,
@@ -504,7 +330,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		"solution score {:?}",
 		initial_score
 			.iter()
-			.map(|n| format!("{:?}", Currency(*n)))
+			.map(|n| format!("{:?}", Currency::from(*n)))
 			.collect::<Vec<_>>(),
 	);
 	log::info!(
@@ -516,11 +342,6 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		target: LOG_TARGET,
 		"Phragmen Assignment size {} bytes.",
 		codec::Encode::encode(&assignments).len(),
-	);
-	log::info!(
-		target: LOG_TARGET,
-		"Phragmen compact Assignment size {} bytes.",
-		codec::Encode::encode(&compact).len(),
 	);
 
 	// potentially write to json file

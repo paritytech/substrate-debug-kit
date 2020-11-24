@@ -8,10 +8,7 @@
 
 use codec::Decode;
 use frame_support::StorageHasher;
-use jsonrpsee::{
-	common::{to_value as to_json_value, Params},
-	Client,
-};
+use jsonrpsee::common::{to_value as to_json_value, Params};
 use sp_core::hashing::twox_128;
 use sp_runtime::traits::BlakeTwo256;
 use std::fmt::Debug;
@@ -24,6 +21,8 @@ pub mod helpers;
 pub use sp_core::storage::{StorageData, StorageKey};
 /// The hash type used by this crate.
 pub type Hash = sp_core::hash::H256;
+/// The client type
+pub type Client = jsonrpsee::Client;
 
 /// Create a client
 pub async fn create_ws_client(endpoint: &str) -> Client {
@@ -163,7 +162,7 @@ pub async fn get_const<T: Decode>(
 		.expect("Runtime Metadata failed to decode");
 	let metadata = prefixed_metadata.1;
 
-	if let RuntimeMetadata::V11(inner) = metadata {
+	if let RuntimeMetadata::V12(inner) = metadata {
 		let decode_modules = unwrap_decoded(inner.modules);
 		for module_encoded in decode_modules.into_iter() {
 			let mod_name = unwrap_decoded(module_encoded.name);
@@ -266,6 +265,14 @@ mod tests {
 	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
 	const TEST_URI: &'static str = "ws://localhost:9944";
 
+	// treasury accounts of each network
+	#[cfg(feature = "remote-test-kusama")]
+	const ACCOUNT: &'static str = "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29";
+	#[cfg(feature = "remote-test-polkadot")]
+	const ACCOUNT: &'static str = "13UVJyLnbVp9RBZYFwFGyDvVd1y27Tt8tkntv6Q7JVPhFsTB";
+	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
+	const ACCOUNT: &'static str = "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29";
+
 	async fn test_client() -> Client {
 		let transport = WsTransportClient::new(TEST_URI)
 			.await
@@ -288,9 +295,11 @@ mod tests {
 		let at = block_on(get_head(&client));
 		// web3 foundation technical account in kusama.
 		let account =
-			hex_literal::hex!["8a0e42d190d3ecaebf11d3834f4b992e0fab469e6bf17056d402cb172b827a22"];
+			<sp_runtime::AccountId32 as sp_core::crypto::Ss58Codec>::from_ss58check(ACCOUNT)
+				.unwrap();
+
 		let data = block_on(read::<AccountInfo<Nonce, AccountData<Balance>>>(
-			map_key::<frame_support::Blake2_128Concat>(b"System", b"Account", &account),
+			map_key::<frame_support::Blake2_128Concat>(b"System", b"Account", account.as_ref()),
 			&client,
 			at,
 		));

@@ -1,5 +1,41 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
 
+export async function councilVotersScrewed() {
+	let endpoint = "ws://localhost::9944"
+	const provider = new WsProvider(endpoint);
+	const api = await ApiPromise.create({ provider })
+
+	let at = "0x715dbf4012cdca810bcb2dca507d856e3fa719f3cf072058a2be378fd3aedeeb"
+	let parent = "0xccb65b526cb22ada2cd4ac08bd73d321dd069d0d2107b4aa5e9ebe48fbd6d16f"
+	let spec = await api.rpc.state.getRuntimeVersion(at);
+	console.log(await (await api.rpc.state.getRuntimeVersion(at)).specVersion.toHuman())
+	console.log(await (await api.rpc.state.getRuntimeVersion(parent)).specVersion.toHuman())
+}
+
+export async function allNominators() {
+	let endpoint = "ws://localhost::9944"
+	const provider = new WsProvider(endpoint);
+	const api = await ApiPromise.create({ provider })
+
+	let entries = await api.query.staking.nominators.keys()
+
+	let stakers = []
+	for (let x of entries.slice(0, 10)) {
+		let k = x.toU8a().slice(-32)
+		let ctrl = (await api.query.staking.bonded(k)).unwrap()
+		let ledger = (await api.query.staking.ledger(ctrl)).unwrapOrDefault()
+		let stake = ledger.active
+		stakers.push({who: x, stake: stake})
+	}
+	stakers.sort((a, b) => {
+		console.log(`${a.stake.toHuman()}.stake.toBn() > ${b.stake.toHuman()}.stake.toBn() = ${a.stake.toBn() > b.stake.toBn()}`)
+		if (a.stake.toBn() > b.stake.toBn()) { return 1 } else if (a.stake.toBn() < b.stake.toBn()) { return -1 } else { return 0 }
+	})
+
+	stakers.forEach(({ who, stake }, _) => {
+		console.log(who.toHuman(), stake.toHuman())
+	})
+}
 
 export async function perbillTest() {
 	let endpoint = "ws://localhost::9944"
@@ -28,6 +64,8 @@ export async function latestElectionSubmissions() {
 		let block = await api.rpc.chain.getBlock(now);
 		let extrinsics = block.block.extrinsics;
 		let events = await api.query.system.events.at(now)
+		let maximum_weight = api.consts.system.maximumBlockWeight.toNumber()
+		let maximum_length = api.consts.system.maximumBlockLength.toNumber()
 
 		for (let ext of extrinsics) {
 			if (ext.meta.name.toString().includes("submit_election_solution")) {
@@ -36,7 +74,8 @@ export async function latestElectionSubmissions() {
 				let weight = await api.query.system.blockWeight.at(now)
 				for (let event of events) {
 					if (event.event.meta.name.includes("SolutionStored")) {
-						console.log(`✅ Found a correct ${ext.meta.name} for era ${era.toHuman()} => score ${ext.args[2]}. Weight = ${weight}. Len = ${ext.encodedLength}`)
+						console.log(`✅ Found a correct ${ext.meta.name} for era ${era.toHuman()} => score ${ext.args[2]}`)
+						console.log(`⌚️ Weight = ${weight} (${weight['normal'].toNumber() / maximum_weight}). Len = ${ext.encodedLength} (${ext.encodedLength / maximum_length})`)
 						found = true
 						break;
 					}
@@ -53,7 +92,6 @@ export async function latestElectionSubmissions() {
 				break;
 			}
 		}
-
 		now = block.block.header.parentHash
 	}
 }
