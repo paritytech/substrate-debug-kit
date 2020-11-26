@@ -188,15 +188,16 @@ impl Builder {
 			let mut filtered_kv = vec![];
 			for f in self.module_filter {
 				let hashed_prefix = twox_128(f.as_bytes());
-				info!(
-					target: LOG_TARGET,
-					"Downloading data for module {} (prefix: {:?}).",
-					f,
-					hashed_prefix.hex_display()
-				);
 				let module_kv =
 					sub_storage::get_pairs(StorageKey(hashed_prefix.to_vec()), &client, at).await;
 
+				info!(
+					target: LOG_TARGET,
+					"Downloading data for module {} (prefix: {:?}) ({} key-values).",
+					f,
+					hashed_prefix.hex_display(),
+					module_kv.len()
+				);
 				for kv in module_kv.into_iter().map(|(k, v)| (k.0, v.0)) {
 					filtered_kv.push(kv);
 				}
@@ -253,17 +254,19 @@ impl Builder {
 			let mut filtered_kv = vec![];
 			for f in self.module_filter {
 				let hashed_prefix = twox_128(f.as_bytes());
-				debug!(
-					target: LOG_TARGET,
-					"Downloading data for module {} (prefix: {:?}).",
-					f,
-					hashed_prefix.hex_display()
-				);
 				let module_kv = wait!(sub_storage::get_pairs(
 					StorageKey(hashed_prefix.to_vec()),
 					&client,
 					at
 				));
+
+				info!(
+					target: LOG_TARGET,
+					"Downloading data for module {} (prefix: {:?}) ({} key-values).",
+					f,
+					hashed_prefix.hex_display(),
+					module_kv.len()
+				);
 
 				for kv in module_kv.into_iter().map(|(k, v)| (k.0, v.0)) {
 					filtered_kv.push(kv);

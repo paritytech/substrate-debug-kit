@@ -14,14 +14,14 @@ env_logger = "0.7.1"
 log = "0.4.11"
 
 sub-storage = { path = "../sub-storage" }
-sp-io = { version = "2.0.0" }
-sp-core = { version = "2.0.0" }
-sp-externalities = { version = "0.8.0" }
+sp-io = { path = "../../substrate/primitives/io" }
+sp-core = { path = "../../substrate/primitives/core" }
+sp-externalities = { path = "../../substrate/primitives/externalities" }
 
 [dev-dependencies]
 hex-literal = "0.3.1"
 tokio-test = "0.2.1"
-frame-system = { version = "2.0.0" }
-frame-support = { version = "2.0.0" }
-pallet-staking = { version = "2.0.0" }
-sp-runtime = { version = "2.0.0" }
+frame-system = { path = "../../substrate/frame/system" }
+frame-support = { path = "../../substrate/frame/support" }
+pallet-staking = { path = "../../substrate/frame/staking" }
+sp-runtime = { path = "../../substrate/primitives/runtime" }

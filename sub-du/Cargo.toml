@@ -15,7 +15,7 @@ log = "0.4.11"
 structopt = { version = "0.3" }
 
 sub-storage = { path = "../sub-storage", features = ["helpers"] }
-frame-metadata = { version = "12.0.0" }
+frame-metadata = { path = "../../substrate/frame/metadata" }
 
 [features]
 default = []
