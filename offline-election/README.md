@@ -1,4 +1,6 @@
-# Offline elections
+# offline-election
+
+## Offline elections
 
 Run election algorithms of substrate (all under `sp-npos-elections`) offline.
 
@@ -13,7 +15,7 @@ Run election algorithms of substrate (all under `sp-npos-elections`) offline.
 > [youtube.com/watch?v=H9OvpAOebTs](https://www.youtube.com/watch?v=H9OvpAOebTs)
 
 
-### Builders
+#### Builders
 
 Several tools have already built on top of this repo, such:
 
@@ -28,7 +30,7 @@ way.
 As of this writing, the validator election of Polkadot/Kusama is as such: seq-phragmen -> random
 iterations of balancing -> reduce. This translates to:
 
-```
+```rust
 cargo run -- staking -i 10 -r
 ```
 
@@ -36,11 +38,11 @@ And **if executed at the correct time** (i.e. while the election window is open)
 *accurately predict the next validator set*, but the nominator stake distribution will be different,
 because the random number of iterations is not known.
 
-## Usage
+### Usage
 
 Simply run `--help`.
 
-```
+```rust
 Offline elections app.
 
 Provides utilities and debug tools around the election pallets of a substrate chain offline.
@@ -84,43 +86,43 @@ SUBCOMMANDS:
     staking                Run the staking election
     validator-check        The general checkup of a validators
 ```
-## Install
+### Install
 
 TODO:
 
-## Example usage
+### Example usage
 
 - Run the council election with 25 members.
 
-```
+```rust
 RUST_LOG=offline-phragmen=trace cargo run -- council --count 25
 ```
 
 - Run the staking election with no equalization at a particular block number
 
-```
+```rust
 cargo run --at 8b7d6e14221b4fefc4b007660c80af6d4a9ac740c50b6e918f61d521553cd17e staking
 ```
 
 - Run the election with only 50 slots, and print all the nominator distributions
 
-```
+```rust
 cargo run -- -vv staking --count 50
 ```
 
 - Run the above again now with `reduce()` and see how most nominator edges are... reduced.
 
-```
+```rust
 cargo run -- -vv staking --count 50 --reduce
 ```
 
 - Run the above again now against a remote node.
 
-```
+```rust
 cargo run -- --uri wss://kusama-rpc.polkadot.io/ -vv staking --count 50 --reduce
 ```
 
-## Connecting to a node
+### Connecting to a node
 
 > Both Polkadot and Kusama are growing fast and scraping the data is becoming harder and harder. I
 > really recommend you to try this script against a local node, or be prepared to wait for a while.
@@ -132,7 +134,7 @@ Connect to a different node using the `--uri` argument e.g. `--uri wss://kusama-
 - **`ws://`** prefix: plain (unencrypted) websockets connection.
 - **`wss://`** prefix: TLS (encrypted) websockets connection.
 
-## Logging
+### Logging
 
 Scripts output additional information as logs. You need to enable them by setting `RUST_LOG`
 environment variable.

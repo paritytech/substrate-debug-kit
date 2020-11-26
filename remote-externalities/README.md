@@ -1,4 +1,6 @@
-# Remote Externalities
+# remote-externalities
+
+## Remote Externalities
 
 An equivalent of `TestExternalities` that can load its state from a remote substrate based chain.
 
@@ -8,7 +10,7 @@ An equivalent of `TestExternalities` that can load its state from a remote subst
   the types that you want to query and **they must be the same as the one used in chain**.
 
 
-### Example
+#### Example
 
 With a test runtime
 
@@ -25,7 +27,7 @@ impl_outer_origin! {
 
 impl frame_system::Trait for TestRuntime {
 	..
-	// we only care about these two for now. The rest can be mock. The block number type of 
+	// we only care about these two for now. The rest can be mock. The block number type of
 	// kusama is u32.
 	type BlockNumber = u32;
 	type Header = Header;

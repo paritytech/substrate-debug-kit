@@ -15,6 +15,8 @@
 //! The most useful features provided by this crate are often marked as unsafe by the substrate
 //! nodes. Namely, [`get_pairs`] and [`enumerate_map`] can only be used against nodes that such
 //! external RPCs.
+//!
+//! THIS IS A TEST.
 
 use codec::Decode;
 use frame_support::StorageHasher;
@@ -81,7 +83,6 @@ pub fn map_prefix_key(module: &[u8], storage: &[u8]) -> StorageKey {
 }
 
 /// create key prefix for a module as vec bytes. Basically twox128 hash of the given values.
-/// TODO: can't we use stuff from frame_support::storage directly here? This is for now a duplicate.
 pub fn module_prefix_raw(module: &[u8], storage: &[u8]) -> Vec<u8> {
 	let module_key = twox_128(module);
 	let storage_key = twox_128(storage);
@@ -104,6 +105,11 @@ pub async fn read<T: Decode>(key: StorageKey, client: &Client, at: Hash) -> Opti
 	<T as Decode>::decode(&mut encoded.as_slice()).ok()
 }
 
+/// Get all storage pairs located under a certain prefix.
+///
+/// ## Warning
+///
+/// This is an unsafe RPC call. It requires connecting to a node that allows it.
 pub async fn get_pairs(
 	prefix: StorageKey,
 	client: &Client,
@@ -118,6 +124,8 @@ pub async fn get_pairs(
 }
 
 /// Enumerate all keys and values in a storage map.
+///
+/// It is basically a wrapper around `get_pairs` that also decodes types.
 pub async fn enumerate_map<K, V>(
 	module: &[u8],
 	storage: &[u8],
@@ -160,6 +168,7 @@ pub fn unwrap_decoded<B: Eq + PartialEq + std::fmt::Debug, O: Eq + PartialEq + s
 	}
 }
 
+/// Get the constant value stored in metadata of a module.
 pub async fn get_const<T: Decode>(
 	client: &Client,
 	module: &str,
@@ -215,35 +224,36 @@ pub async fn get_head(client: &Client) -> Hash {
 pub async fn get_header(
 	client: &Client,
 	at: Hash,
-) -> sp_runtime::generic::Header<u32, BlakeTwo256> {
+) -> Option<sp_runtime::generic::Header<u32, BlakeTwo256>> {
 	let at = to_json_value(at).expect("Block hash serialization infallible");
-	let data: Option<sp_runtime::generic::Header<u32, BlakeTwo256>> = client
+	client
 		.request("chain_getHeader", Params::Array(vec![at]))
 		.await
-		.expect("get chain header request failed");
-	data.unwrap()
+		.expect("get chain header request failed")
 }
 
 /// Get the metadata of a chain.
+///
+/// Cannot fail. Runtime must always have some bytes as metadata.
 pub async fn get_metadata(client: &Client, at: Hash) -> sp_core::Bytes {
 	let at = to_json_value(at).expect("Block hash serialization infallible");
 	let data: Option<sp_core::Bytes> = client
 		.request("state_getMetadata", Params::Array(vec![at]))
 		.await
 		.expect("Failed to decode block");
-
-	data.unwrap()
+	data.expect("Metadata must exist")
 }
 
 /// Get the runtime version at the given block.
+///
+/// Cannot fail. Runtime must always have some version.
 pub async fn get_runtime_version(client: &Client, at: Hash) -> sp_version::RuntimeVersion {
 	let at = to_json_value(at).expect("Block hash serialization infallible");
 	let data: Option<sp_version::RuntimeVersion> = client
 		.request("state_getRuntimeVersion", Params::Array(vec![at]))
 		.await
-		.expect("Failed to decode block");
-
-	data.unwrap()
+		.expect("Failed to fetch version");
+	data.expect("Version must exist")
 }
 
 /// Get the size of a storage map.
