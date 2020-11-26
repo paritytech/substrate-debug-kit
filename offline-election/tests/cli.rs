@@ -1,5 +1,7 @@
 use assert_cmd::Command;
 
+const TEST_URI: &'static str = "ws://localhost:9944";
+
 #[test]
 #[ignore = "requires unsafe RPC"]
 fn staking_works() {

@@ -25,7 +25,7 @@ function submitPreImage(api, preImage, dryRun) {
         const keyring = new api_2.Keyring({ type: 'sr25519' });
         const SENDER = keyring.addFromUri('//Alice');
         if (dryRun) {
-            const tx = api.tx.democracy.notePreimage(preImage);
+            const tx = yield api.tx.democracy.notePreimage(preImage).signAsync(SENDER);
             const info = yield api.rpc.payment.queryInfo(tx.toHex());
             const dryRun = yield api.rpc.system.dryRun(tx.toHex());
             console.log(info.toHuman());
@@ -547,13 +547,14 @@ function buildRefundTx(chain, slashMap, api) {
         console.log("preimage: ", tx.method.toHex());
         console.log("hash:", tx.method.hash.toHex());
         console.log("sum: ", api.createType('Balance', sum).toHuman());
-        return { preImage: tx.method.toU8a(), hash: tx.meta.hash.toU8a() };
+        fs_1.writeFileSync(`${chain}-preimage-${tx.method.hash.toHex()}.bin`, tx.method.toHex());
+        return { preImage: tx.method.toHex(), hash: tx.meta.hash.toHex() };
     });
 }
 (() => __awaiter(void 0, void 0, void 0, function* () {
     const provider = new api_1.WsProvider(process.argv[2]);
     const api = yield api_1.ApiPromise.create({ provider });
-    const chain = "kusama";
+    const chain = "polkadot";
     // -- scrape and create a new cache election json file
     // unlinkSync(`elections.${chain}.json`)
     // let elections = await findElections(api, chain);
@@ -569,5 +570,7 @@ function buildRefundTx(chain, slashMap, api) {
     let slashMap = yield calculateRefund(elections, api);
     yield parseCSVSimple(api, slashMap);
     const { preImage, hash } = yield buildRefundTx(chain, slashMap, api);
+    // const preImage = readFileSync(`${chain}-preimage-0x683b144f5dc9fe9875261fc75ffb49c7d047669a887ab639d7c322783cf6593d.bin`).toString()
+    // console.log('preImage', preImage)
     yield submitPreImage(api, preImage, true);
 }))();

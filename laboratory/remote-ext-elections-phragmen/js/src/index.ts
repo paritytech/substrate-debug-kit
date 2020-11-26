@@ -11,12 +11,12 @@ import { blake2AsHex, xxhashAsHex, } from "@polkadot/util-crypto";
 import { TextEncoder } from "util";
 import { Keyring } from '@polkadot/api';
 
-async function submitPreImage(api: ApiPromise, preImage: Uint8Array, dryRun: boolean) {
+async function submitPreImage(api: ApiPromise, preImage: string, dryRun: boolean) {
 	const keyring = new Keyring({ type: 'sr25519' });
 	const SENDER = keyring.addFromUri('//Alice')
 
 	if(dryRun) {
-		const tx = api.tx.democracy.notePreimage(preImage);
+		const tx = await api.tx.democracy.notePreimage(preImage).signAsync(SENDER);
 		const info = await api.rpc.payment.queryInfo(tx.toHex());
 		const dryRun = await api.rpc.system.dryRun(tx.toHex())
 		console.log(info.toHuman());
@@ -581,8 +581,8 @@ async function getCurrentRole(who: string, api: ApiPromise): Promise<string> {
 }
 
 interface Refund {
-	preImage: Uint8Array,
-	hash: Uint8Array,
+	preImage: string,
+	hash: string,
 }
 async function buildRefundTx(chain: string, slashMap: Map<string, BN>, api: ApiPromise): Promise<Refund> {
 	let treasuryAccount = new Uint8Array(32);
@@ -612,13 +612,15 @@ async function buildRefundTx(chain: string, slashMap: Map<string, BN>, api: ApiP
 	console.log("hash:", tx.method.hash.toHex())
 	console.log("sum: ", api.createType('Balance', sum).toHuman())
 
-	return { preImage: tx.method.toU8a(), hash: tx.meta.hash.toU8a() }
+	writeFileSync(`${chain}-preimage-${tx.method.hash.toHex()}.bin`, tx.method.toHex());
+
+	return { preImage: tx.method.toHex(), hash: tx.meta.hash.toHex() }
 }
 
 (async () => {
 	const provider = new WsProvider(process.argv[2])
 	const api = await ApiPromise.create( { provider })
-	const chain = "kusama"
+	const chain = "polkadot"
 
 	// -- scrape and create a new cache election json file
 	// unlinkSync(`elections.${chain}.json`)
@@ -637,5 +639,9 @@ async function buildRefundTx(chain: string, slashMap: Map<string, BN>, api: ApiP
 	let slashMap = await calculateRefund(elections, api);
 	await parseCSVSimple(api, slashMap)
 	const { preImage, hash } = await buildRefundTx(chain, slashMap, api);
+
+	// const preImage = readFileSync(`${chain}-preimage-0x683b144f5dc9fe9875261fc75ffb49c7d047669a887ab639d7c322783cf6593d.bin`).toString()
+	// console.log('preImage', preImage)
+
 	await submitPreImage(api, preImage, true)
 })()
