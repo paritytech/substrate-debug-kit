@@ -49,7 +49,7 @@ frame_support::construct_runtime!(
 	}
 );
 
-impl frame_system::Trait for Runtime {
+impl frame_system::Config for Runtime {
 	type BaseCallFilter = ();
 	type Origin = Origin;
 	type Index = u32;
@@ -77,7 +77,7 @@ impl frame_system::Trait for Runtime {
 	type SystemWeightInfo = ();
 }
 
-impl pallet_balances::Trait for Runtime {
+impl pallet_balances::Config for Runtime {
 	type Balance = Balance;
 	type MaxLocks = ();
 	type Event = ();
@@ -100,7 +100,7 @@ parameter_types! {
 	pub const TermDuration: BlockNumber = 7 * time::DAYS;
 }
 
-impl pallet_elections_phragmen::Trait for Runtime {
+impl pallet_elections_phragmen::Config for Runtime {
 	type ModuleId = ElectionsPhragmenModuleId;
 	type Event = ();
 	type Currency = Balances;
@@ -124,6 +124,18 @@ pub const CENTS: Balance = DOLLARS / 100;
 pub const MILLICENTS: Balance = CENTS / 1_000;
 
 const URI: &'static str = "ws://localhost:9944";
+
+pub struct PhragmenElectionDepositRuntimeUpgrade;
+impl pallet_elections_phragmen::migrations_3_0_0::V2ToV3 for PhragmenElectionDepositRuntimeUpgrade {
+	type AccountId = AccountId;
+	type Balance = Balance;
+	type Module = ElectionsPhragmen;
+}
+impl frame_support::traits::OnRuntimeUpgrade for PhragmenElectionDepositRuntimeUpgrade {
+	fn on_runtime_upgrade() -> frame_support::weights::Weight {
+		pallet_elections_phragmen::migrations_3_0_0::apply::<Self>(5 * CENTS, DOLLARS)
+	}
+}
 
 #[async_std::main]
 async fn main() -> () {
@@ -159,10 +171,11 @@ async fn main() -> () {
 			))
 			.unwrap();
 
-			pallet_elections_phragmen::migrations::migrate_to_3_0_0::<Runtime>(
-				5 * CENTS,
-				1 * DOLLARS,
-			);
+			let weight = pallet_elections_phragmen::migrations_3_0_0::apply::<
+				PhragmenElectionDepositRuntimeUpgrade,
+			>(5 * CENTS, 1 * DOLLARS);
+
+			assert!(weight > 0);
 
 			<Voting<Runtime>>::iter().for_each(|(_, voting)| {
 				assert_eq!(voting.deposit, 5 * CENTS);
