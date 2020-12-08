@@ -7,7 +7,7 @@ use crate::{
 };
 use codec::Encode;
 use pallet_staking::{
-	slashing::SlashingSpans, EraIndex, Exposure, Nominations, StakingLedger, ValidatorPrefs,
+	slashing::SlashingSpans, EraIndex, Exposure, Nominations, StakingLedger,
 };
 use sp_npos_elections::*;
 use sp_runtime::traits::Convert;
@@ -19,7 +19,7 @@ const MODULE: &[u8] = b"Staking";
 #[derive(Debug, Clone, Default)]
 struct Staker {
 	ctrl: Option<AccountId>,
-	stake: Balance,
+	stake: Option<StakingLedger<AccountId, Balance>>,
 }
 
 fn assert_supports_total_equal(s1: &SupportMap<AccountId>, s2: &SupportMap<AccountId>) {
@@ -34,47 +34,26 @@ pub async fn get_current_era(client: &Client, at: Hash) -> EraIndex {
 }
 
 async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
-	storage::enumerate_map::<AccountId, ValidatorPrefs>(MODULE, b"Validators", client, at)
+	storage::enumerate_keys_paged::<AccountId>(MODULE, b"Validators", client, at)
 		.await
 		.expect("Staking::validators should be enumerable.")
 		.into_iter()
-		.map(|(v, _p)| v)
 		.collect::<Vec<AccountId>>()
 }
 
 async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>)> {
-	let nominators: Vec<(AccountId, Nominations<AccountId>)> = storage::enumerate_map::<
+
+	let nominators: Vec<(AccountId, Nominations<AccountId>)> = storage::enumerate_map_paged::<
 		AccountId,
 		Nominations<AccountId>,
 	>(MODULE, b"Nominators", client, at)
-	.await
-	.expect("Staking::nominators should be enumerable");
+		.await
+		.expect("Staking::nominators should be enumerable");
+
 
 	let mut result = vec![];
-	for (idx, (who, n)) in nominators.into_iter().enumerate() {
-		// retain only targets who have not been yet slashed recently. This is highly dependent
-		// on the staking implementation.
-		let submitted_in = n.submitted_in;
+	for (_idx, (who, n)) in nominators.into_iter().enumerate() {
 		let targets = n.targets;
-		let mut filtered_targets = vec![];
-		// TODO: move back to closures and retain, but async-std::block_on can't work well here for
-		// whatever reason. Or move to streams?
-		for target in targets.iter() {
-			let maybe_slashing_spans = slashing_span_of(&target, client, at).await;
-			if maybe_slashing_spans.map_or(true, |spans| submitted_in >= spans.last_nonzero_slash())
-			{
-				filtered_targets.push(target.clone());
-			}
-		}
-
-		log::trace!(
-			target: LOG_TARGET,
-			"[{}] retaining {}/{} nominations for {:?}",
-			idx,
-			filtered_targets.len(),
-			targets.len(),
-			who,
-		);
 
 		result.push((who, targets));
 	}
@@ -88,21 +67,35 @@ async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> 
 		&client,
 		at,
 	)
-	.await
-	.expect("All stashes must have 'Bonded' storage.");
+	.await;
+
+	if !ctrl.is_some() {
+		return Staker{
+			ctrl: None,
+			stake: None,
+		}
+	}
+
+	let ctrl_val = ctrl.clone().unwrap();
 
 	let ledger = storage::read::<StakingLedger<AccountId, Balance>>(
-		storage::map_key::<frame_support::Blake2_128Concat>(MODULE, b"Ledger", ctrl.as_ref()),
+		storage::map_key::<frame_support::Blake2_128Concat>(MODULE, b"Ledger", ctrl_val.as_ref()),
 		&client,
 		at,
-	)
-	.await
-	.expect("All controllers must have a 'Ledger' storage");
+	).await;
 
-	Staker {
-		ctrl: Some(ctrl),
-		stake: ledger.active,
+	if !ledger.is_some() {
+		return Staker{
+			ctrl: None,
+			stake: None,
+		}
 	}
+
+	return Staker {
+		ctrl: ctrl,
+		stake: ledger,
+	}
+
 }
 
 /// Get the slashing span of a voter stash.
@@ -165,8 +158,8 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	}
 
 	t_start!(data_scrape);
-	// stash key of all wannabe candidates.
-	let candidates = get_candidates(client, at).await;
+
+	let candidates = get_candidates(&client, at).await;
 
 	// stash key of current voters, including maybe self vote.
 	let mut all_voters = get_voters(&client, at).await;
@@ -178,15 +171,19 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	});
 
 	// get the slashable balance of every entity
-	let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
+	let mut staker_infos: BTreeMap<AccountId, Balance> = BTreeMap::new();
 
 	for stash in candidates.iter().chain(all_voters.iter().map(|(s, _)| s)) {
 		let staker_info = get_staker_info_entry(&stash, &client, at).await;
-		staker_infos.insert(stash.clone(), staker_info);
+		if staker_info.ctrl.is_some()&&staker_info.stake.is_some(){
+			staker_infos.insert(stash.clone(), staker_info.stake.unwrap().active.clone());
+		}
 	}
 	t_stop!(data_scrape);
 
-	let slashable_balance = |who: &AccountId| -> Balance { staker_infos.get(who).unwrap().stake };
+	let slashable_balance = |who: &AccountId| -> Balance{
+		return staker_infos.get(who).unwrap().clone()
+	};
 	let slashable_balance_votes = |who: &AccountId| -> VoteWeight {
 		<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(
 			slashable_balance(who),
@@ -290,13 +287,13 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		log::info!("💰 Nominator Assignments:");
 		let mut counter = 1;
 		for (nominator, info) in nominator_info.iter() {
-			let staker_info = staker_infos.get(&nominator).unwrap();
+			let staker_info = staker_infos.get(&nominator).unwrap().clone();
 			let mut sum = 0;
 			println!(
 				"#{} {:?} // active_stake = {:?}",
 				counter,
 				nominator,
-				Currency::from(staker_info.stake),
+				Currency::from(staker_info),
 			);
 			println!("  Distributions:");
 			info.iter().enumerate().for_each(|(i, (c, s))| {
@@ -304,7 +301,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 				println!("    #{} {:?} => {:?}", i, c, Currency::from(*s));
 			});
 			counter += 1;
-			let diff = sum.max(staker_info.stake) - sum.min(staker_info.stake);
+			let diff = sum.max(staker_info) - sum.min(staker_info);
 			// acceptable diff is one millionth of a Currency
 			assert!(
 				diff < 1_000,

@@ -3,3 +3,5 @@ log
 out
 .vscode
 node_modules
+.idea
+jsonrpsee

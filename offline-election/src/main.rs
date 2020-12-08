@@ -317,6 +317,7 @@ async fn main() -> () {
 	let address_format = match &network_address[..] {
 		"polkadot" => Ss58AddressFormat::PolkadotAccount,
 		"kusama" => Ss58AddressFormat::KusamaAccount,
+		"darwinia" => Ss58AddressFormat::DarwiniaAccount,
 		"substrate" => Ss58AddressFormat::SubstrateAccount,
 		_ => panic!("Invalid network/address format."),
 	};

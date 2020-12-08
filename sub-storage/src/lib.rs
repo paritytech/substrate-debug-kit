@@ -36,6 +36,8 @@ pub type Hash = sp_core::hash::H256;
 /// The client type
 pub type Client = jsonrpsee::Client;
 
+const MAX_KEY_SIZE: u32 = 256 as u32;
+
 /// Create a client
 pub async fn create_ws_client(endpoint: &str) -> Client {
 	let transport = jsonrpsee::transport::ws::WsTransportClient::new(endpoint)
@@ -105,6 +107,35 @@ pub async fn read<T: Decode>(key: StorageKey, client: &Client, at: Hash) -> Opti
 	<T as Decode>::decode(&mut encoded.as_slice()).ok()
 }
 
+
+pub async fn get_keys_paged(
+	prefix: StorageKey,
+	client: &Client,
+	at: Hash,
+	count: u32,
+) -> Vec<StorageKey> {
+	let serialized_prefix = to_json_value(prefix).expect("StorageKey serialization infallible");
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let count = to_json_value(count).expect("count value");
+	client
+		.request("state_getKeysPaged", Params::Array(vec![serialized_prefix.clone(), count.clone(),serialized_prefix.clone(),at]))
+		.await
+		.expect("Storage state_getKeysPaged failed")
+}
+
+
+pub async fn get_keys(
+	prefix: StorageKey,
+	client: &Client,
+	at: Hash,
+) -> Vec<StorageKey> {
+	let serialized_prefix = to_json_value(prefix).expect("StorageKey serialization infallible");
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	client
+		.request("state_getKeys", Params::Array(vec![serialized_prefix.clone(), at]))
+		.await
+		.expect("Storage state_getKeysPaged failed")
+}
 /// Get all storage pairs located under a certain prefix.
 ///
 /// ## Warning
@@ -155,6 +186,61 @@ where
 			}
 		})
 		.collect::<Result<Vec<(K, V)>, &'static str>>()
+}
+
+pub async fn enumerate_map_paged<K, V>(
+	module: &[u8],
+	storage: &[u8],
+	client: &Client,
+	at: Hash,
+) -> Result<Vec<(K, V)>, &'static str>
+	where
+		K: Decode + Debug + Clone + AsRef<[u8]>,
+		V: Decode + Clone + Debug,
+{
+	let prefix = map_prefix_key(module.clone(), storage.clone());
+	let raw = get_keys_paged(prefix, client, at, MAX_KEY_SIZE).await;
+	let mut result = vec![];
+
+	for k in raw.into_iter() {
+		let mut full_key = k.clone().0;
+		let full_len = full_key.len();
+		let value = read::<V>(k.clone(), client, at).await.expect("");
+		let raw_key = full_key.drain(full_len - 32..).collect::<Vec<_>>();
+		let key = <K as Decode>::decode(&mut raw_key.as_slice()).unwrap();
+		result.push((key, value));
+	}
+
+	return Ok(result);
+}
+
+pub async fn enumerate_keys_paged<K>(
+	module: &[u8],
+	storage: &[u8],
+	client: &Client,
+	at: Hash,
+) -> Result<Vec<K>, &'static str>
+	where
+		K: Decode + Debug + Clone + AsRef<[u8]>,
+{
+	let prefix = map_prefix_key(module.clone(), storage.clone());
+	let raw = get_keys_paged(prefix, client, at, MAX_KEY_SIZE).await;
+
+	raw.into_iter()
+		.map(|k| {
+			let mut full_key = k.0;
+			let full_len = full_key.len();
+			let key = full_key.drain(full_len - 32..).collect::<Vec<_>>();
+			key
+		})
+		.map(|raw_key| {
+			let key = <K as Decode>::decode(&mut raw_key.as_slice());
+			match key {
+				Ok(key) => Ok(key),
+				_ => Err("failed to decode map prefix"),
+			}
+		})
+		.collect::<Result<Vec<K>, &'static str>>()
 }
 
 /// Unwrap an decode a metadata entry.
