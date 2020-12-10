@@ -37,8 +37,8 @@ pub type Hash = sp_core::hash::H256;
 pub type Client = jsonrpsee::Client;
 
 
-const MAX_KEY_SIZE: u32 = 16;
-const Page_Size: u32 = 4;
+const MAX_KEY_SIZE: u32 = 256;
+const PAGE_SIZE: u32 = 32;
 
 
 /// Create a client
@@ -122,11 +122,11 @@ pub async fn get_keys_paged(
 	let mut start = serialized_prefix.clone();
 	loop {
 		let page_result:Vec<StorageKey> = client
-			.request("state_getKeysPaged", Params::Array(vec![serialized_prefix.clone(), to_json_value(Page_Size).unwrap(), start.clone(), at.clone()]))
+			.request("state_getKeysPaged", Params::Array(vec![serialized_prefix.clone(), to_json_value(PAGE_SIZE).unwrap(), start.clone(), at.clone()]))
 			.await
 			.expect("Storage state_getKeysPaged failed");
 		result.extend(page_result.clone());
-		if page_result.len() < Page_Size as usize || result.len() >=MAX_KEY_SIZE as usize {
+		if page_result.len() < PAGE_SIZE as usize || result.len() >=MAX_KEY_SIZE as usize {
 			break
 		}
 		let last = page_result.len()-1;
