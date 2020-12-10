@@ -36,7 +36,10 @@ pub type Hash = sp_core::hash::H256;
 /// The client type
 pub type Client = jsonrpsee::Client;
 
-const MAX_KEY_SIZE: u32 = 256 as u32;
+
+const MAX_KEY_SIZE: u32 = 16;
+const Page_Size: u32 = 4;
+
 
 /// Create a client
 pub async fn create_ws_client(endpoint: &str) -> Client {
@@ -112,15 +115,24 @@ pub async fn get_keys_paged(
 	prefix: StorageKey,
 	client: &Client,
 	at: Hash,
-	count: u32,
 ) -> Vec<StorageKey> {
 	let serialized_prefix = to_json_value(prefix).expect("StorageKey serialization infallible");
 	let at = to_json_value(at).expect("Block hash serialization infallible");
-	let count = to_json_value(count).expect("count value");
-	client
-		.request("state_getKeysPaged", Params::Array(vec![serialized_prefix.clone(), count.clone(),serialized_prefix.clone(),at]))
-		.await
-		.expect("Storage state_getKeysPaged failed")
+	let mut result = vec![];
+	let mut start = serialized_prefix.clone();
+	loop {
+		let page_result:Vec<StorageKey> = client
+			.request("state_getKeysPaged", Params::Array(vec![serialized_prefix.clone(), to_json_value(Page_Size).unwrap(), start.clone(), at.clone()]))
+			.await
+			.expect("Storage state_getKeysPaged failed");
+		result.extend(page_result.clone());
+		if page_result.len() < Page_Size as usize || result.len() >=MAX_KEY_SIZE as usize {
+			break
+		}
+		let last = page_result.len()-1;
+		start = to_json_value(page_result[last].clone()).unwrap();
+	}
+	return result;
 }
 
 
@@ -199,13 +211,13 @@ pub async fn enumerate_map_paged<K, V>(
 		V: Decode + Clone + Debug,
 {
 	let prefix = map_prefix_key(module.clone(), storage.clone());
-	let raw = get_keys_paged(prefix, client, at, MAX_KEY_SIZE).await;
+	let raw = get_keys_paged(prefix, client, at).await;
 	let mut result = vec![];
 
 	for k in raw.into_iter() {
-		let mut full_key = k.clone().0;
-		let full_len = full_key.len();
 		let value = read::<V>(k.clone(), client, at).await.expect("");
+		let mut full_key = k.0;
+		let full_len = full_key.len();
 		let raw_key = full_key.drain(full_len - 32..).collect::<Vec<_>>();
 		let key = <K as Decode>::decode(&mut raw_key.as_slice()).unwrap();
 		result.push((key, value));
@@ -224,7 +236,7 @@ pub async fn enumerate_keys_paged<K>(
 		K: Decode + Debug + Clone + AsRef<[u8]>,
 {
 	let prefix = map_prefix_key(module.clone(), storage.clone());
-	let raw = get_keys_paged(prefix, client, at, MAX_KEY_SIZE).await;
+	let raw = get_keys_paged(prefix, client, at).await;
 
 	raw.into_iter()
 		.map(|k| {
