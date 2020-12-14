@@ -5,3 +5,4 @@ out
 node_modules
 .idea
 jsonrpsee
+data_*.json

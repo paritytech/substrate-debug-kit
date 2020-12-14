@@ -210,6 +210,10 @@ pub struct Opt {
 	#[structopt(short, parse(from_occurrences))]
 	verbosity: u64,
 
+	/// If scrapedfile provided,then run phragmen directly based on data in the file
+	#[structopt(short, long)]
+	scrapedfile: Option<String>,
+
 	/// The subcommand.
 	#[structopt(subcommand)] // Note that we mark a field as a subcommand
 	cmd: SubCommands,
@@ -259,9 +263,13 @@ pub struct StakingConfig {
 	#[structopt(short, long)]
 	count: Option<usize>,
 
+	/// max num of voters will be fetched,normally there should not be such limitation,just for develop&test purpose
+	#[structopt(short, long)]
+	max: Option<usize>,
+
 	/// Json output file name. dumps the results into if given.
-	#[structopt(parse(from_os_str))]
-	output: Option<PathBuf>,
+	#[structopt(short, long)]
+	output: Option<String>,
 
 	/// Number of balancing rounds.
 	#[structopt(short, long, default_value = "0")]
