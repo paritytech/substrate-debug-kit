@@ -78,10 +78,8 @@ async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> 
 		}
 	}
 
-	let ctrl_val = ctrl.clone().unwrap();
-
 	let ledger = storage::read::<StakingLedger<AccountId, Balance>>(
-		storage::map_key::<frame_support::Blake2_128Concat>(MODULE, b"Ledger", ctrl_val.as_ref()),
+		storage::map_key::<frame_support::Blake2_128Concat>(MODULE, b"Ledger", ctrl.clone().unwrap().as_ref()),
 		&client,
 		at,
 	).await;
@@ -143,12 +141,18 @@ async fn get_validator_count(client: &Client, at: Hash) -> u32 {
 }
 
 /// run phragmen directly from data scraped
-pub async fn run_from_data_scraped(conf: StakingConfig,candidates: &Vec<AccountId>,all_voters: &Vec<(AccountId,Vec<AccountId>)>,staker_infos: &BTreeMap<AccountId, u128>) {
-	let verbosity = 2;
+pub async fn run_phragmen(data:ScrapeData,opt: &Opt,conf: &StakingConfig) {
+	let verbosity = opt.verbosity;
+	let candidates = data.candidates;
+	let all_voters = data.voters;
+	let mut staker_infos:BTreeMap<AccountId, u128> = BTreeMap::new();
+	for (k, v) in data.stakers.clone().into_iter() {
+		let balance = v as u128;
+		staker_infos.insert(k, balance);
+	}
 	let iterations = conf.iterations;
 	let count = conf.count.unwrap_or(candidates.len());
 	let reduce = conf.reduce;
-
 	let slashable_balance = |who: &AccountId| -> Balance{
 		return staker_infos.get(who).unwrap().clone()
 	};
@@ -221,18 +225,20 @@ pub async fn run_from_data_scraped(conf: StakingConfig,candidates: &Vec<AccountI
 			.iter()
 			.filter(|(v, _)| v == s)
 			.collect::<Vec<_>>();
-		assert!(self_stake.len() == 1);
-		println!(
-			"#{} --> [{:?}] [total backing = {:?} ({} voters)] [own backing = {:?}]",
-			i + 1,
-			s,
-			Currency::from(support.total),
-			other_count,
-			Currency::from(self_stake[0].1),
-		);
+		if self_stake.len() >0 {
+			assert!(self_stake.len() == 1);
+			println!(
+				"#{} --> [{:?}] [total backing = {:?} ({} voters)] [own backing = {:?}]",
+				i + 1,
+				s,
+				Currency::from(support.total),
+				other_count,
+				Currency::from(self_stake[0].1),
+			);
+		}
 
 		if verbosity >= 1 {
-			println!("  Voters:");
+			println!("  Voters for {:?}:",*s );
 			support.voters.iter().enumerate().for_each(|(i, o)| {
 				println!(
 					"    {}#{} [amount = {:?}] {:?}",
@@ -309,7 +315,7 @@ pub async fn run_from_data_scraped(conf: StakingConfig,candidates: &Vec<AccountI
 	);
 
 	// potentially write to json file
-	if let Some(output_file) = conf.output {
+	if let Some(output_file) = &conf.output {
 
 		// We can't really use u128 or arbitrary_precision of serde for now, so sadly all I can do
 		// is duplicate the types with u64. Not cool but okay for now.
@@ -351,84 +357,81 @@ pub async fn run_from_data_scraped(conf: StakingConfig,candidates: &Vec<AccountI
 use serde::{Serialize, Deserialize};
 use std::io::BufReader;
 
+/// ScrapeData
 #[derive(Serialize, Deserialize)]
-struct ScrapeData {
+pub struct ScrapeData {
 	candidates: Vec<AccountId>,
 	voters: Vec<(AccountId, Vec<AccountId>)>,
 	stakers: BTreeMap<AccountId, u64>,
 }
 
-/// Main run function of the sub-command.
-pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
-	let candidates:Vec<AccountId>;
-	let mut all_voters:Vec<(AccountId, Vec<AccountId>)>;
+/// scrape data from rpc
+pub async fn scrape(client: &Client,opt: &Opt, conf: &StakingConfig) -> ScrapeData{
+	let at = opt.at.unwrap();
+	let val_count = get_validator_count(&client, at).await as usize;
+	let count = conf.count.unwrap_or(val_count);
+	if count != val_count {
+		log::warn!(
+			target: LOG_TARGET,
+			"`count` provided ({:?}) differs from validator count on-chain ({}).",
+			count,
+			val_count,
+		);
+	}
+	let max = conf.max.unwrap_or(100000);
+
+	t_start!(data_scrape);
+
+	let candidates = get_candidates(&client, at, max).await;
+
+	// stash key of current voters, including maybe self vote.
+	let mut all_voters = get_voters(&client, at,max).await;
+
+	// add self-vote
+	candidates.iter().for_each(|v| {
+		let self_vote = (v.clone(), vec![v.clone()]);
+		all_voters.push(self_vote);
+	});
+
+	// get the slashable balance of every entity
 	let mut staker_infos: BTreeMap<AccountId, u128> = BTreeMap::new();
 	let mut staker_infos_u64: BTreeMap<AccountId, u64> = BTreeMap::new();
-
-	if opt.scrapedfile.is_none() {
-		let at = opt.at.unwrap();
-		let val_count = get_validator_count(&client, at).await as usize;
-		let count = conf.count.unwrap_or(val_count);
-		if count != val_count {
-			log::warn!(
-				target: LOG_TARGET,
-				"`count` provided ({:?}) differs from validator count on-chain ({}).",
-				count,
-				val_count,
+	for stash in all_voters.iter().map(|(s, _)| s) {
+		let staker_info = get_staker_info_entry(&stash, &client, at).await;
+		if staker_info.ctrl.is_some()&&staker_info.stake.is_some(){
+			let balance = staker_info.stake.unwrap().active;
+			println!(
+				"#{:?} // active_stake = {:?}",
+				stash,
+				Currency::from(balance),
 			);
-		}
-		let max = conf.max.unwrap_or(100000);
-
-		t_start!(data_scrape);
-
-		candidates = get_candidates(&client, at, max).await;
-
-		// stash key of current voters, including maybe self vote.
-		all_voters = get_voters(&client, at,max).await;
-
-		// add self-vote
-		candidates.iter().for_each(|v| {
-			let self_vote = (v.clone(), vec![v.clone()]);
-			all_voters.push(self_vote);
-		});
-
-		// get the slashable balance of every entity
-
-		for stash in all_voters.iter().map(|(s, _)| s) {
-			let staker_info = get_staker_info_entry(&stash, &client, at).await;
-			if staker_info.ctrl.is_some()&&staker_info.stake.is_some(){
-				let balance = staker_info.stake.unwrap().active;
-				println!(
-					"#{:?} // active_stake = {:?}",
-					stash,
-					Currency::from(balance),
-				);
-				staker_infos.insert(stash.clone(), balance);
-				let balance_u64 = <network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(balance);
-				staker_infos_u64.insert(stash.clone(),balance_u64);
-			}
-		}
-		t_stop!(data_scrape);
-
-		let output_file = Path::new("./data_scraped.json");
-		let data = ScrapeData {
-			candidates: candidates.clone(),
-			voters: all_voters.clone(),
-			stakers:staker_infos_u64.clone(),
-		};
-		let output = serde_json::json!(data);
-		serde_json::to_writer_pretty(&File::create(output_file).unwrap(), &output).unwrap();
-	}else{
-		let file = File::open(opt.scrapedfile.unwrap()).unwrap();
-		let reader = BufReader::new(file);
-		let data :ScrapeData = serde_json::from_reader(reader).unwrap();
-		candidates = data.candidates;
-		all_voters = data.voters;
-		for (k, v) in data.stakers.clone().into_iter() {
-			let balance = <network::CurrencyToVoteHandler as Convert<Balance, Balance>>::convert(v.try_into().unwrap());
-			staker_infos.insert(k, balance);
+			staker_infos.insert(stash.clone(), balance);
+			let balance_u64 = balance as u64;
+			staker_infos_u64.insert(stash.clone(),balance_u64);
 		}
 	}
+	t_stop!(data_scrape);
 
-	run_from_data_scraped(conf,&candidates,&all_voters,&staker_infos).await;
+	let data = ScrapeData {
+		candidates: candidates.clone(),
+		voters: all_voters.clone(),
+		stakers:staker_infos_u64.clone(),
+	};
+	let output_file = Path::new("./data_scraped.json");
+	let output = serde_json::json!(data);
+	serde_json::to_writer_pretty(&File::create(output_file).unwrap(), &output).unwrap();
+	return data;
+}
+
+/// Main run function of the sub-command.
+pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
+	let data:ScrapeData;
+	if conf.input.is_none() {
+		data = scrape(client,&opt,&conf).await
+	}else{
+		let file = File::open(conf.input.clone().unwrap()).unwrap();
+		let reader = BufReader::new(file);
+		data = serde_json::from_reader(reader).unwrap();
+	}
+	run_phragmen(data,&opt,&conf).await;
 }

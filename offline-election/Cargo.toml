@@ -4,6 +4,10 @@ version = "1.0.0"
 authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2018"
 
+[[bin]]
+name = "debugkit"
+path = "src/main.rs"
+
 [dependencies]
 async-std = { version = "1.6.2", features = ["attributes"] }
 jsonrpsee = { version = "0.1.0", features = ["ws"] }

@@ -210,10 +210,6 @@ pub struct Opt {
 	#[structopt(short, parse(from_occurrences))]
 	verbosity: u64,
 
-	/// If scrapedfile provided,then run phragmen directly based on data in the file
-	#[structopt(short, long)]
-	scrapedfile: Option<String>,
-
 	/// The subcommand.
 	#[structopt(subcommand)] // Note that we mark a field as a subcommand
 	cmd: SubCommands,
@@ -267,9 +263,13 @@ pub struct StakingConfig {
 	#[structopt(short, long)]
 	max: Option<usize>,
 
+	/// If input file provided,then run phragmen directly based on data in the file
+	#[structopt(long,parse(from_os_str))]
+	input: Option<PathBuf>,
+
 	/// Json output file name. dumps the results into if given.
-	#[structopt(short, long)]
-	output: Option<String>,
+	#[structopt(long,parse(from_os_str))]
+	output: Option<PathBuf>,
 
 	/// Number of balancing rounds.
 	#[structopt(short, long, default_value = "0")]
@@ -335,6 +335,9 @@ async fn main() -> () {
 	if address_format.eq(&Ss58AddressFormat::PolkadotAccount) {
 		sub_tokens::dynamic::set_name(&"DOT");
 		sub_tokens::dynamic::set_decimal_points(10_000_000_000);
+	}else if address_format.eq(&Ss58AddressFormat::DarwiniaAccount) {
+		sub_tokens::dynamic::set_name(&"POWER");
+		sub_tokens::dynamic::set_decimal_points(10_000_000_00);
 	}
 
 	// set total issuance
