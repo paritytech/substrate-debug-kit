@@ -166,6 +166,8 @@ use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use sub_storage as storage;
+use sp_runtime::traits::Convert;
+use sp_npos_elections::VoteWeight;
 
 mod network;
 mod primitives;
@@ -332,16 +334,22 @@ async fn main() -> () {
 
 	// setup address format and currency based on address format.
 	set_default_ss58_version(address_format);
+	sub_tokens::dynamic::set_network(opt.clone().network.clone().unwrap());
 	if address_format.eq(&Ss58AddressFormat::PolkadotAccount) {
 		sub_tokens::dynamic::set_name(&"DOT");
 		sub_tokens::dynamic::set_decimal_points(10_000_000_000);
 	}else if address_format.eq(&Ss58AddressFormat::DarwiniaAccount) {
 		sub_tokens::dynamic::set_name(&"POWER");
-		sub_tokens::dynamic::set_decimal_points(10_000_000_00);
+		sub_tokens::dynamic::set_decimal_points(1_000u128);
 	}
 
 	// set total issuance
 	network::issuance::set(&client, at).await;
+	println!("total issuance:{}",network::issuance::get());
+	let val = <network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(
+		network::issuance::get()
+	);
+	println!("converted issuance:{}",val);
 
 	log::info!(target: LOG_TARGET, "program args: {:?}", opt);
 	log::info!(

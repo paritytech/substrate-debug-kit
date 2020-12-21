@@ -10,7 +10,6 @@ use pallet_staking::{
 	slashing::SlashingSpans, EraIndex, Exposure, Nominations, StakingLedger,
 };
 use sp_npos_elections::*;
-use sp_runtime::traits::Convert;
 use std::{collections::BTreeMap, convert::TryInto};
 use std::fs::File;
 use std::path::Path;
@@ -157,9 +156,13 @@ pub async fn run_phragmen(data:ScrapeData,opt: &Opt,conf: &StakingConfig) {
 		return staker_infos.get(who).unwrap().clone()
 	};
 	let slashable_balance_votes = |who: &AccountId| -> VoteWeight {
-		<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(
-			slashable_balance(who),
-		)
+		if sub_tokens::dynamic::get_network() == "darwinia"{
+			return slashable_balance(who) as u64
+		}else{
+			return <network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(
+				slashable_balance(who),
+			)
+		}
 	};
 
 	// run phragmen
@@ -356,6 +359,7 @@ pub async fn run_phragmen(data:ScrapeData,opt: &Opt,conf: &StakingConfig) {
 
 use serde::{Serialize, Deserialize};
 use std::io::BufReader;
+use sp_runtime::traits::Convert;
 
 /// ScrapeData
 #[derive(Serialize, Deserialize)]

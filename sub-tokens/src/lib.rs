@@ -109,6 +109,9 @@ pub mod dynamic {
 
 		/// Name of the currency token based on the network.
 		static TOKEN_NAME: RefCell<&'static str> = RefCell::new("GTK");
+
+		/// Name of the Network
+		static NETWORK_NAME: RefCell<String> = RefCell::new("polkadot".to_string())
 	}
 
 	pub fn set_name(name: &'static str) {
@@ -117,6 +120,15 @@ pub mod dynamic {
 
 	pub fn set_decimal_points(decimal: u128) {
 		DECIMAL_POINTS.with(|v| *v.borrow_mut() = decimal);
+	}
+
+	pub fn set_network(name: String) {
+		NETWORK_NAME.with(|v| *v.borrow_mut() = name);
+	}
+
+	pub fn get_network() -> String {
+		let name = NETWORK_NAME.with(|v| v.clone().into_inner());
+		return name.clone();
 	}
 
 	/// Wrapper to pretty-print currency token.
