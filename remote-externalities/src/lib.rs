@@ -167,6 +167,11 @@ impl Builder {
 		self
 	}
 
+	pub fn cache(mut self) -> Self {
+		// TODO
+		self
+	}
+
 	/// Build the test externalities.
 	///
 	/// This is an async function, otherwise does the same as `build`.

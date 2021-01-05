@@ -32,3 +32,4 @@ pallet-staking-reward-curve = { path = "../../substrate/frame/staking/reward-cur
 pallet-balances = { path = "../../substrate/frame/balances" }
 pallet-session = { path = "../../substrate/frame/session" }
 pallet-timestamp = { path = "../../substrate/frame/timestamp" }
+parking_lot = "0.10.2"

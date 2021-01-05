@@ -1,17 +1,5 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
 
-export async function councilVotersScrewed() {
-	let endpoint = "ws://localhost::9944"
-	const provider = new WsProvider(endpoint);
-	const api = await ApiPromise.create({ provider })
-
-	let at = "0x715dbf4012cdca810bcb2dca507d856e3fa719f3cf072058a2be378fd3aedeeb"
-	let parent = "0xccb65b526cb22ada2cd4ac08bd73d321dd069d0d2107b4aa5e9ebe48fbd6d16f"
-	let spec = await api.rpc.state.getRuntimeVersion(at);
-	console.log(await (await api.rpc.state.getRuntimeVersion(at)).specVersion.toHuman())
-	console.log(await (await api.rpc.state.getRuntimeVersion(parent)).specVersion.toHuman())
-}
-
 export async function allNominators() {
 	let endpoint = "ws://localhost::9944"
 	const provider = new WsProvider(endpoint);
@@ -60,12 +48,15 @@ export async function latestElectionSubmissions() {
 
 	const head = await api.rpc.chain.getFinalizedHead();
 	let now = head
+	console.log(`starting at ${now}`);
+	let _electionStatus = await api.query.staking.eraElectionStatus.at(now);
 	while (true) {
 		let block = await api.rpc.chain.getBlock(now);
 		let extrinsics = block.block.extrinsics;
 		let events = await api.query.system.events.at(now)
 		let maximum_weight = api.consts.system.maximumBlockWeight.toNumber()
 		let maximum_length = api.consts.system.maximumBlockLength.toNumber()
+		let electionStatus = await api.query.staking.eraElectionStatus.at(now);
 
 		for (let ext of extrinsics) {
 			if (ext.meta.name.toString().includes("submit_election_solution")) {
@@ -92,6 +83,12 @@ export async function latestElectionSubmissions() {
 				break;
 			}
 		}
+
+		if (_electionStatus.isClose !== electionStatus.isClose) {
+			console.log(`change in election status at ${(await api.rpc.chain.getHeader(now)).number}. previous ${_electionStatus}, now ${electionStatus}`)
+			_electionStatus = electionStatus
+		}
+
 		now = block.block.header.parentHash
 	}
 }

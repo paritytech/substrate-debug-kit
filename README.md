@@ -25,3 +25,16 @@ A collection of debug tools and libraries around substrate chains.
 - **`tokens`**: Quite a dumb and small crate that provides wrappers for easy pretty-printing tokens
   like `DOT`. Somewhat similar to the `toHuman()` interface of the javascript API.
 - **`laboratory`**: This is where I try new stuff.
+
+## Brain Dump 🧠
+
+- **Substrate module sidecar**: A wrapper around remote-externalities that allows you to run a
+  substrate module in a TextExternalities environment and constantly feed the new block data into
+  it. Would need to listen to new blocks, upon each block:
+  1. call `Module::on_initialize()`.
+  2. scan for any transaction in that block that might be targeted to this module (how? call
+     matching), call them directly
+  3. call `Module::on_finalize()`.
+  4. Wipe the state and update it to the new state of the newly imported block.
+
+Notes: will probably be a pain to do because of rust dependency clashes.

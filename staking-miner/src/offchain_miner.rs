@@ -1,5 +1,6 @@
-use crate::mock_runtime::{Runtime, Staking};
+use crate::mock_runtime::{offchainify, Runtime, Staking, Timestamp};
 use codec::Encode;
+use frame_support::traits::OffchainWorker;
 use frame_support::{
 	storage::StorageValue, traits::UnfilteredDispatchable, weights::GetDispatchInfo,
 };
@@ -13,10 +14,10 @@ use sub_storage::{Client, Hash};
 
 /// Main function of this command.
 pub async fn run(_client: &Client, at: Hash) {
-	submit_now(at).await;
+	submit_at(at).await;
 }
 
-async fn submit_now(at: Hash) {
+pub async fn submit_at(at: Hash) {
 	remote_externalities::Builder::new()
 		.module("Staking")
 		.at(at)
@@ -25,6 +26,7 @@ async fn submit_now(at: Hash) {
 		.execute_with(|| {
 			let queued_score = Staking::queued_score();
 			log::info!("queued_score = {:?}", queued_score);
+			log::info!("now = {:?}", Timestamp::now());
 
 			// compute raw solution. Note that we use `OffchainAccuracy`.
 			let ElectionResult {

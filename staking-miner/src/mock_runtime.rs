@@ -160,6 +160,7 @@ parameter_types! {
 	pub const MaxNominatorRewardedPerValidator: u32 = 64;
 	pub const UnsignedPriority: u64 = 1 << 20;
 	pub const MinSolutionScoreBump: Perbill = Perbill::zero();
+	pub const MaxIterations: u32 = 10;
 	pub OffchainSolutionWeightLimit: Weight = MaximumExtrinsicWeight::get()
 		.saturating_sub(BlockExecutionWeight::get())
 		.saturating_sub(ExtrinsicBaseWeight::get());
@@ -179,13 +180,36 @@ where
 
 pub type Extrinsic = TestXt<Call, ()>;
 
+use parking_lot::RwLock;
+use sp_core::offchain::{
+	testing::{PoolState, TestOffchainExt, TestTransactionPoolExt},
+	OffchainExt, TransactionPoolExt,
+};
+/// Just in case, we should not really need this often.
+use sp_io::TestExternalities;
+use std::sync::Arc;
+pub fn offchainify(ext: &mut TestExternalities, iterations: u32) -> Arc<RwLock<PoolState>> {
+	let (offchain, offchain_state) = TestOffchainExt::new();
+	let (pool, pool_state) = TestTransactionPoolExt::new();
+
+	let mut seed = [0_u8; 32];
+	seed[0..4].copy_from_slice(&iterations.to_le_bytes());
+	offchain_state.write().seed = seed;
+
+	ext.register_extension(OffchainExt::new(offchain));
+	ext.register_extension(TransactionPoolExt::new(pool));
+
+	pool_state
+}
+
 impl pallet_staking::Trait for Runtime {
 	type BondingDuration = BondingDuration;
 	type Currency = pallet_balances::Module<Runtime>;
 	type CurrencyToVote = frame_support::traits::U128CurrencyToVote;
 	type ElectionLookahead = ();
 	type Event = ();
-	type MaxIterations = ();
+	type Call = Call;
+	type MaxIterations = MaxIterations;
 	type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
 	type MinSolutionScoreBump = MinSolutionScoreBump;
 	type NextNewSession = Session;
