@@ -37,4 +37,4 @@ A collection of debug tools and libraries around substrate chains.
   3. call `Module::on_finalize()`.
   4. Wipe the state and update it to the new state of the newly imported block.
 
-Notes: will probably be a pain to do because of rust dependency clashes.
+Notes: will probably be a pain to do because of rust dependency clashes. Using wasm would make this easier, but then debugging will become harder. 
