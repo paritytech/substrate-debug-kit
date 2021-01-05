@@ -347,6 +347,33 @@ mod tests {
 	}
 
 	#[test]
+	fn kusama_1832() {
+		// https://github.com/paritytech/polkadot/pull/1832
+		type AccountId = sp_runtime::AccountId32;
+		sp_core::crypto::set_default_ss58_version(
+			sp_core::crypto::Ss58AddressFormat::KusamaAccount,
+		);
+		let client = block_on(test_client());
+		let at =
+			hex_literal::hex!["715dbf4012cdca810bcb2dca507d856e3fa719f3cf072058a2be378fd3aedeeb"]
+				.into();
+
+		block_on(enumerate_map::<AccountId, (u128, Vec<AccountId>)>(
+			b"PhragmenElection",
+			b"Voting",
+			&client,
+			at,
+		))
+		.unwrap()
+		.into_iter()
+		.for_each(|(acc, _)| {
+			let mut raw = [0u8; 32];
+			raw.copy_from_slice(acc.as_ref());
+			println!("{},{:?}", acc, raw);
+		});
+	}
+
+	#[test]
 	fn get_const_works() {
 		let client = block_on(test_client());
 		let at = block_on(get_head(&client));

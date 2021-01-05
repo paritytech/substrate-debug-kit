@@ -1780,7 +1780,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-staking-reward-curve"
+name = "pallet-staking/reward-curve"
 version = "2.0.0"
 dependencies = [
  "proc-macro-crate",
@@ -3003,7 +3003,7 @@ dependencies = [
  "pallet-balances",
  "pallet-session",
  "pallet-staking",
- "pallet-staking-reward-curve",
+ "pallet-staking/reward-curve",
  "pallet-timestamp",
  "parity-scale-codec",
  "parking_lot 0.10.2",

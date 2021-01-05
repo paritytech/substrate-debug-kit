@@ -25,7 +25,7 @@ sp-npos-elections = { path = "../../substrate/primitives/npos-elections" }
 frame-support = { path = "../../substrate/frame/support" }
 frame-system = { path = "../../substrate/frame/system" }
 pallet-staking = { path = "../../substrate/frame/staking" }
-pallet-staking-reward-curve = { path = "../../substrate/frame/staking/reward-curve" }
+pallet-staking/reward-curve = { path = "../../substrate/frame/staking/reward-curve" }
 pallet-balances = { path = "../../substrate/frame/balances" }
 pallet-session = { path = "../../substrate/frame/session" }
 pallet-timestamp = { path = "../../substrate/frame/timestamp" }
