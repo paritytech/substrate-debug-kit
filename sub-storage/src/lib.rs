@@ -346,6 +346,7 @@ mod tests {
 		assert_eq!(size, 4);
 	}
 
+	#[ignore = "This needs a local node."]
 	#[test]
 	fn kusama_1832() {
 		// https://github.com/paritytech/polkadot/pull/1832
