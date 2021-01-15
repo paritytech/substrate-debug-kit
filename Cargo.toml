@@ -6,4 +6,5 @@ members = [
 	"sub-tokens",
 	"offline-election",
 	"remote-externalities",
+	"substrate-runtime-dry-run",
 ]

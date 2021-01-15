@@ -258,17 +258,18 @@ impl Builder {
 			let mut filtered_kv = vec![];
 			for f in self.module_filter {
 				let hashed_prefix = twox_128(f.as_bytes());
-				debug!(
-					target: LOG_TARGET,
-					"Downloading data for module {} (prefix: {:?}).",
-					f,
-					hashed_prefix.hex_display()
-				);
 				let module_kv = wait!(sub_storage::get_pairs(
 					StorageKey(hashed_prefix.to_vec()),
 					&client,
 					at
 				));
+				debug!(
+					target: LOG_TARGET,
+					"Downloaded data for module {} (prefix: {:?}) (count = {}).",
+					f,
+					hashed_prefix.hex_display(),
+					module_kv.len(),
+				);
 
 				for kv in module_kv.into_iter().map(|(k, v)| (k.0, v.0)) {
 					filtered_kv.push(kv);
