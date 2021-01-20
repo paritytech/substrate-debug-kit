@@ -56,6 +56,7 @@ fn test_runtime_works() {
 ```
 
 Or with the real kusama runtime.
+
 ```rust
 use remote_externalities::Builder;
 use kusama_runtime::Runtime;

@@ -36,10 +36,10 @@
 //! - https://polkadot.pro/phragmen.php
 //! - https://polkadot.staking4all.org/
 //!
-//! Note that the npos results generate by this repo or any of the above tools will not be exactly equal
-//! to that of polkadot and kusama. This is highly dependent on the arguments passed to the `staking`
-//! sub-command. The NPoS solution of both polkadot and kusama is being computed in a non-deterministic
-//! way.
+//! Note that the npos results generate by this repo or any of the above tools will not be exactly
+//! equal to that of polkadot and kusama. This is highly dependent on the arguments passed to the
+//! `staking` sub-command. The NPoS solution of both polkadot and kusama is being computed in a
+//! non-deterministic way.
 //!
 //! As of this writing, the validator election of Polkadot/Kusama is as such: seq-phragmen -> random
 //! iterations of balancing -> reduce. This translates to:
@@ -49,8 +49,8 @@
 //! ```
 //!
 //! And **if executed at the correct time** (i.e. while the election window is open), this should
-//! *accurately predict the next validator set*, but the nominator stake distribution will be different,
-//! because the random number of iterations is not known.
+//! *accurately predict the next validator set*, but the nominator stake distribution will be
+//! different, because the random number of iterations is not known.
 //!
 //! ## Usage
 //!
@@ -138,12 +138,15 @@
 //!
 //! ## Connecting to a node
 //!
-//! > Both Polkadot and Kusama are growing fast and scraping the data is becoming harder and harder. I
-//! > really recommend you to try this script against a local node, or be prepared to wait for a while.
+//! > Both Polkadot and Kusama are growing fast and scraping the data is becoming harder and harder.
+//! I > really recommend you to try this script against a local node, or be prepared to wait for a
+//! while.
 //!
-//! By default it will attempt to connect to a locally running node running at `ws://127.0.0.1:9944`.
+//! By default it will attempt to connect to a locally running node running at
+//! `ws://127.0.0.1:9944`.
 //!
-//! Connect to a different node using the `--uri` argument e.g. `--uri wss://kusama-rpc.polkadot.io/`.
+//! Connect to a different node using the `--uri` argument e.g. `--uri
+//! wss://kusama-rpc.polkadot.io/`.
 //!
 //! - **`ws://`** prefix: plain (unencrypted) websockets connection.
 //! - **`wss://`** prefix: TLS (encrypted) websockets connection.
@@ -291,10 +294,7 @@ pub struct CouncilConfig {
 
 #[async_std::main]
 async fn main() -> () {
-	env_logger::Builder::from_default_env()
-		.format_module_path(false)
-		.format_level(true)
-		.init();
+	env_logger::Builder::from_default_env().format_module_path(false).format_level(true).init();
 
 	let mut opt = Opt::from_args();
 

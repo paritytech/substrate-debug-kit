@@ -31,7 +31,7 @@
 //! let kiz = KIZ::from(100);
 //! assert_eq!(format!("{}", kiz), "0,100 KIZ");
 //! assert_eq!(format!("{:?}", kiz), "0,100 KIZ (100)");
-//!```
+//! ```
 //!
 //! ## Dynamic Tokens
 //!

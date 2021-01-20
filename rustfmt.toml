@@ -1,0 +1,14 @@
+hard_tabs = true
+
+merge_imports = true
+reorder_imports = false
+
+wrap_comments = true
+max_width = 100
+comment_width = 100
+format_strings = true
+use_small_heuristics = "Max"
+
+trailing_comma = "Vertical"
+
+edition = "2018"

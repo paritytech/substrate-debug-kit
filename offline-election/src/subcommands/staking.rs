@@ -99,10 +99,7 @@ async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> 
 	.await
 	.expect("All controllers must have a 'Ledger' storage");
 
-	Staker {
-		ctrl: Some(ctrl),
-		stake: ledger.active,
-	}
+	Staker { ctrl: Some(ctrl), stake: ledger.active }
 }
 
 /// Get the slashing span of a voter stash.
@@ -195,27 +192,22 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 
 	// run phragmen
 	t_start!(phragmen_run);
-	let ElectionResult {
-		winners,
-		assignments,
-	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
-		count,
-		0,
-		candidates.clone(),
-		all_voters
-			.iter()
-			.cloned()
-			.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
-			.collect::<Vec<_>>(),
-		// Some((iterations, 0)),
-	)
-	.expect("Phragmen failed to elect.");
+	let ElectionResult { winners, assignments } =
+		seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
+			count,
+			0,
+			candidates.clone(),
+			all_voters
+				.iter()
+				.cloned()
+				.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
+				.collect::<Vec<_>>(),
+			// Some((iterations, 0)),
+		)
+		.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
 
-	let elected_stashes = winners
-		.iter()
-		.map(|(s, _)| s.clone())
-		.collect::<Vec<AccountId>>();
+	let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
 
 	t_start!(ratio_into_staked_run);
 	let mut staked_assignments =
@@ -251,11 +243,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	for (i, (s, _)) in winners.iter().enumerate() {
 		let support = supports.get(&s).unwrap();
 		let other_count = support.voters.len();
-		let self_stake = support
-			.voters
-			.iter()
-			.filter(|(v, _)| v == s)
-			.collect::<Vec<_>>();
+		let self_stake = support.voters.iter().filter(|(v, _)| v == s).collect::<Vec<_>>();
 		assert!(self_stake.len() == 1);
 		println!(
 			"#{} --> {} [{:?}] [total backing = {:?} ({} voters)] [own backing = {:?}]",
@@ -277,10 +265,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 					Currency::from(o.1),
 					o.0
 				);
-				nominator_info
-					.entry(o.0.clone())
-					.or_insert(vec![])
-					.push((s.clone(), o.1));
+				nominator_info.entry(o.0.clone()).or_insert(vec![]).push((s.clone(), o.1));
 			});
 			println!("");
 		}
@@ -306,20 +291,12 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 			counter += 1;
 			let diff = sum.max(staker_info.stake) - sum.min(staker_info.stake);
 			// acceptable diff is one millionth of a Currency
-			assert!(
-				diff < 1_000,
-				"diff( sum_nominations,  staker_info.ledger.active) = {}",
-				diff
-			);
+			assert!(diff < 1_000, "diff( sum_nominations,  staker_info.ledger.active) = {}", diff);
 			println!("");
 		}
 	}
 
-	log::info!(
-		target: LOG_TARGET,
-		"validator intentions count {:?}",
-		candidates.len(),
-	);
+	log::info!(target: LOG_TARGET, "validator intentions count {:?}", candidates.len(),);
 	log::info!(
 		target: LOG_TARGET,
 		"nominator intentions count {:?}",
@@ -328,10 +305,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	log::info!(
 		target: LOG_TARGET,
 		"solution score {:?}",
-		initial_score
-			.iter()
-			.map(|n| format!("{:?}", Currency::from(*n)))
-			.collect::<Vec<_>>(),
+		initial_score.iter().map(|n| format!("{:?}", Currency::from(*n))).collect::<Vec<_>>(),
 	);
 	log::info!(
 		target: LOG_TARGET,

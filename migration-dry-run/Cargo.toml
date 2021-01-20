@@ -1,0 +1,23 @@
+[package]
+name = "substrate-runtime-dry-run"
+version = "0.1.0"
+authors = ["kianenigma <kian.peymani@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+jsonrpsee = { version = "0.1.0", features = ["ws"] }
+async-std = { version = "1.6.2", features = ["attributes"] }
+env_logger = "0.8.2"
+log = "0.4.13"
+
+node-runtime = { package = "kusama-runtime", path = "../../polkadot/runtime/kusama" }
+
+remote-externalities = { path = "../remote-externalities" }
+sub-storage = { path = "../sub-storage" }
+frame-support = { path = "../../substrate/frame/support" }
+frame-system = { path = "../../substrate/frame/system" }
+
+[workspace]

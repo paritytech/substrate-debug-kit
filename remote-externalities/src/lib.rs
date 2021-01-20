@@ -1,11 +1,13 @@
 //! # Remote Externalities
 //!
-//! An equivalent of `TestExternalities` that can load its state from a remote substrate based chain.
+//! An equivalent of `TestExternalities` that can load its state from a remote substrate based
+//! chain.
 //!
-//! - For now, the `build()` method is not async and will block. This is so that the test code would be
-//!   freed from dealing with an executor or async tests.
-//! - You typically have two options, either use a mock runtime or a real one. In the case of a mock, you only care about
-//!   the types that you want to query and **they must be the same as the one used in chain**.
+//! - For now, the `build()` method is not async and will block. This is so that the test code would
+//!   be freed from dealing with an executor or async tests.
+//! - You typically have two options, either use a mock runtime or a real one. In the case of a
+//!   mock, you only care about the types that you want to query and **they must be the same as the
+//!   one used in chain**.
 //!
 //!
 //! ### Example
@@ -72,7 +74,7 @@
 
 use log::*;
 use sp_core::hashing::twox_128;
-use sp_io::TestExternalities;
+pub use sp_io::TestExternalities;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use sub_storage::StorageKey;
 
@@ -193,15 +195,16 @@ impl Builder {
 			let mut filtered_kv = vec![];
 			for f in self.module_filter {
 				let hashed_prefix = twox_128(f.as_bytes());
-				info!(
-					target: LOG_TARGET,
-					"Downloading data for module {} (prefix: {:?}).",
-					f,
-					hashed_prefix.hex_display()
-				);
 				let module_kv =
 					sub_storage::get_pairs(StorageKey(hashed_prefix.to_vec()), &client, at).await;
 
+				info!(
+					target: LOG_TARGET,
+					"Downloaded data for module {} (count: {} / prefix: {:?}).",
+					f,
+					module_kv.len(),
+					hashed_prefix.hex_display()
+				);
 				for kv in module_kv.into_iter().map(|(k, v)| (k.0, v.0)) {
 					filtered_kv.push(kv);
 				}
@@ -217,18 +220,9 @@ impl Builder {
 		};
 
 		// inject all the scraped keys and values.
-		info!(
-			target: LOG_TARGET,
-			"injecting a total of {} keys",
-			keys_and_values.len()
-		);
+		info!(target: LOG_TARGET, "injecting a total of {} keys", keys_and_values.len());
 		for (k, v) in keys_and_values {
-			trace!(
-				target: LOG_TARGET,
-				"injecting {:?} -> {:?}",
-				k.hex_display(),
-				v.hex_display()
-			);
+			trace!(target: LOG_TARGET, "injecting {:?} -> {:?}", k.hex_display(), v.hex_display());
 			ext.insert(k, v);
 		}
 
@@ -264,11 +258,8 @@ impl Builder {
 					f,
 					hashed_prefix.hex_display()
 				);
-				let module_kv = wait!(sub_storage::get_pairs(
-					StorageKey(hashed_prefix.to_vec()),
-					&client,
-					at
-				));
+				let module_kv =
+					wait!(sub_storage::get_pairs(StorageKey(hashed_prefix.to_vec()), &client, at));
 
 				for kv in module_kv.into_iter().map(|(k, v)| (k.0, v.0)) {
 					filtered_kv.push(kv);
@@ -277,29 +268,16 @@ impl Builder {
 			filtered_kv
 		} else {
 			debug!(target: LOG_TARGET, "Downloading data for all modules.");
-			wait!(sub_storage::get_pairs(
-				StorageKey(Default::default()),
-				&client,
-				at
-			))
-			.into_iter()
-			.map(|(k, v)| (k.0, v.0))
-			.collect::<Vec<_>>()
+			wait!(sub_storage::get_pairs(StorageKey(Default::default()), &client, at))
+				.into_iter()
+				.map(|(k, v)| (k.0, v.0))
+				.collect::<Vec<_>>()
 		};
 
 		// inject all the scraped keys and values.
-		info!(
-			target: LOG_TARGET,
-			"injecting a total of {} keys",
-			keys_and_values.len()
-		);
+		info!(target: LOG_TARGET, "injecting a total of {} keys", keys_and_values.len());
 		for (k, v) in keys_and_values {
-			trace!(
-				target: LOG_TARGET,
-				"injecting {:?} -> {:?}",
-				k.hex_display(),
-				v.hex_display()
-			);
+			trace!(target: LOG_TARGET, "injecting {:?} -> {:?}", k.hex_display(), v.hex_display());
 			ext.insert(k, v);
 		}
 
@@ -377,16 +355,8 @@ mod tests_dummy {
 			hex!["989e0785569561ce174507121a9c85d34f72e07cf3a1bfb95a8a2c10ba0e2847"].into(),
 		);
 
-		Builder::new()
-			.uri(TEST_URI.into())
-			.at(hash)
-			.module("System")
-			.build()
-			.execute_with(|| {
-				assert_eq!(
-					<frame_system::Module<TestRuntime>>::block_hash(3098545u32),
-					parent,
-				)
-			});
+		Builder::new().uri(TEST_URI.into()).at(hash).module("System").build().execute_with(|| {
+			assert_eq!(<frame_system::Module<TestRuntime>>::block_hash(3098545u32), parent,)
+		});
 	}
 }

@@ -1,4 +1,5 @@
-const fs = require('fs')
+const fs = require('fs');
+const { networkInterfaces } = require('os');
 const path = require('path')
 const dirs = ["remote-externalities", "offline-election", "sub-storage", "sub-du"]
 
@@ -10,9 +11,11 @@ const VERSION_TYPE = {
 }
 
 const SPECIAL_VERSIONS = {
-	"frame-metadata": "12.0.0",
-	"sp-externalities": "0.8.0",
+	"frame-metadata": "12.0.1",
+	"sp-externalities": "0.8.1",
 };
+
+const SUB_FRAME_PACKAGES = ['reward-curve']
 
 function set_exact(package, version, with_optional) {
 	if (SPECIAL_VERSIONS[package]) {
@@ -68,6 +71,12 @@ function do_update(content, version) {
 					break
 				case VERSION_TYPE.LOCAL :
 					let frame_package = package.split("-").slice(1).join("-")
+					for (let sub of SUB_FRAME_PACKAGES) {
+						if (frame_package.includes(sub)) {
+							frame_package = frame_package.split(`-${sub}`)[0] + `/${sub}`
+							break;
+						}
+					}
 					output += set_local(package, "frame", frame_package, line.includes("optional"))
 					break
 			}

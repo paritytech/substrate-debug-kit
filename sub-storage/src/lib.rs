@@ -22,7 +22,6 @@ use codec::Decode;
 use frame_support::StorageHasher;
 use jsonrpsee::common::{to_value as to_json_value, Params};
 use sp_core::hashing::twox_128;
-use sp_runtime::traits::BlakeTwo256;
 use std::fmt::Debug;
 
 /// Helper's module.
@@ -221,15 +220,21 @@ pub async fn get_head(client: &Client) -> Hash {
 ///
 /// This is technically not a storage operation but RPC, but we will keep it here since it is very
 /// useful in lots of places.
-pub async fn get_header(
-	client: &Client,
-	at: Hash,
-) -> Option<sp_runtime::generic::Header<u32, BlakeTwo256>> {
+pub async fn get_header<H: serde::de::DeserializeOwned>(client: &Client, at: Hash) -> Option<H> {
 	let at = to_json_value(at).expect("Block hash serialization infallible");
 	client
 		.request("chain_getHeader", Params::Array(vec![at]))
 		.await
 		.expect("get chain header request failed")
+}
+
+/// Get the block at the the given hash.
+pub async fn get_block<B: serde::de::DeserializeOwned>(client: &Client, at: Hash) -> Option<B> {
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	client
+		.request("chain_getBlock", Params::Array(vec![at]))
+		.await
+		.expect("get chain block request failed")
 }
 
 /// Get the metadata of a chain.
