@@ -2,7 +2,7 @@
 
 ## Current Process
 
-> My best effort at making an end-to-end migration testing tool.
+> My best-effort at making an end-to-end migration testing tool in the least amount of time.
 
 The setup is as follows:
 
