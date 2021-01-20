@@ -15,6 +15,8 @@ The setup is as follows:
 |--/substrate-debug-kit
 ```
 
+- Needless to say, you need a locally synced node of your desired chain with unsafe RPCs open. 
+
 - You always want your substrate to point to either the latest master (if you are right before a release), or a branch ahead of master (while developing a new feature that is not merged yet).
 
 - You need to have a path override (to the sibling substrate folder) for all the substrate dependencies in the current working directory (`./substrate-debug-kit/migration-dry-run/.cargo`). Also, you need to have the same one in your polkadot folder as well (`./polkadot/.cargo` -- I am not quite sure about the logic of these overrides, cargo warns that they are buggy, I just happen to know that this works).
