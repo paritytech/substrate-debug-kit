@@ -10,7 +10,7 @@ The setup is as follows:
 
 ```
 .
-|--/substeate
+|--/substrate
 |--/polkadot
 |--/substrate-debug-kit
 ```
