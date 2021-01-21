@@ -5,7 +5,7 @@ authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2018"
 
 [dependencies]
-async-std = { version = "1.6.2", features = ["attributes"] }
+async-std = { version = "1.9.0", features = ["attributes"] }
 jsonrpsee = { version = "0.1.0", features = ["ws"] }
 url = "2.1.1"
 log = "0.4.11"
@@ -23,17 +23,17 @@ sub-storage = { path = "../sub-storage", features = ["helpers"] }
 sub-tokens = { path = "../sub-tokens" }
 remote-externalities = { path = "../remote-externalities" }
 
-sp-core = { version = "2.0.0" }
-sp-io = { version = "2.0.0" }
-sp-runtime = { version = "2.0.0" }
-sp-npos-elections = { version = "2.0.0" }
-frame-support = { version = "2.0.0" }
-frame-system = { version = "2.0.0" }
-pallet-staking = { version = "2.0.0" }
-pallet-staking-reward-curve = { version = "2.0.0" }
-pallet-balances = { version = "2.0.0" }
-pallet-session = { version = "2.0.0" }
-pallet-timestamp = { version = "2.0.0" }
+sp-core = { version = "2.0.1" }
+sp-io = { version = "2.0.1" }
+sp-runtime = { version = "2.0.1" }
+sp-npos-elections = { version = "2.0.1" }
+frame-support = { version = "2.0.1" }
+frame-system = { version = "2.0.1" }
+pallet-staking = { version = "2.0.1" }
+pallet-staking-reward-curve = { version = "2.0.1" }
+pallet-balances = { version = "2.0.1" }
+pallet-session = { version = "2.0.1" }
+pallet-timestamp = { version = "2.0.1" }
 
 
 [dev-dependencies]

@@ -1982,6 +1982,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "migration-dry-run"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "env_logger 0.8.2",
+ "frame-support 2.0.1",
+ "frame-system 2.0.1",
+ "jsonrpsee",
+ "kusama-runtime",
+ "log",
+ "remote-externalities",
+ "sub-storage",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3542,7 +3557,7 @@ dependencies = [
  "parity-scale-codec",
  "separator",
  "sp-core 2.0.1",
- "sp-externalities 0.8.1",
+ "sp-externalities 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sp-io 2.0.1",
  "sub-storage",
 ]
@@ -4309,6 +4324,17 @@ dependencies = [
 [[package]]
 name = "sp-debug-derive"
 version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "558a1a24f2feab950ce382923b62879f253207c6cbf7832eb1e47dba5f57fba8"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.8",
+ "syn 1.0.58",
+]
+
+[[package]]
+name = "sp-debug-derive"
+version = "2.0.1"
 source = "git+https://github.com/paritytech/substrate?branch=master#2d5a75d762c0408e4c341fd55f0d55e20dc6c017"
 dependencies = [
  "proc-macro2 1.0.24",
@@ -4324,6 +4350,18 @@ dependencies = [
  "parity-scale-codec",
  "sp-std 2.0.1",
  "sp-storage 2.0.1",
+]
+
+[[package]]
+name = "sp-externalities"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "144c39acb7affd7a9ce478e289157b9a6c225e3f08a7d4d2f4fee85cc3899684"
+dependencies = [
+ "environmental",
+ "parity-scale-codec",
+ "sp-std 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sp-storage 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -4695,6 +4733,12 @@ version = "2.0.1"
 [[package]]
 name = "sp-std"
 version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2585fb8f5f4fde53c2f9ccebac4517da4dc435373a8fcaf5db7f54b798da66c2"
+
+[[package]]
+name = "sp-std"
+version = "2.0.1"
 source = "git+https://github.com/paritytech/substrate?branch=master#2d5a75d762c0408e4c341fd55f0d55e20dc6c017"
 
 [[package]]
@@ -4707,6 +4751,20 @@ dependencies = [
  "serde",
  "sp-debug-derive 2.0.1",
  "sp-std 2.0.1",
+]
+
+[[package]]
+name = "sp-storage"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "781cc04c8d61c7bb1c269ca68d5d001fcaafbca8a21af46f87bf2e79a749c295"
+dependencies = [
+ "impl-serde",
+ "parity-scale-codec",
+ "ref-cast",
+ "serde",
+ "sp-debug-derive 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sp-std 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -4953,21 +5011,6 @@ dependencies = [
  "log",
  "prometheus",
  "tokio",
-]
-
-[[package]]
-name = "substrate-runtime-dry-run"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "env_logger 0.8.2",
- "frame-support 2.0.1",
- "frame-system 2.0.1",
- "jsonrpsee",
- "kusama-runtime",
- "log",
- "remote-externalities",
- "sub-storage",
 ]
 
 [[package]]

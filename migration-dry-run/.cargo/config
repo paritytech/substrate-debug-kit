@@ -1,1 +1,2 @@
-paths = ["/Users/kianenigma/Desktop/Parity/substrate/"]
+paths = [ "../../substrate" ]
+

@@ -15,13 +15,15 @@ The setup is as follows:
 |--/substrate-debug-kit
 ```
 
-- Needless to say, you need a locally synced node of your desired chain with unsafe RPCs open. 
+- Needless to say, you need a locally synced node of your desired chain with unsafe RPCs open.
 
-- You always want your substrate to point to either the one being used in polkadot (if you are right before a release), or a branch ahead of master (while developing a new feature that is not merged yet). All in all though, as long as the substrate and polkadot placed next to each other compile against each other, it should be fine. 
+- You always want your substrate to point to either the one being used in polkadot (if you are right before a release), or a branch ahead of master (while developing a new feature that is not merged yet). All in all though, the main point is that the sibling polkadot and substrate need to be compatible.
 
-- You need to have a path override (to the sibling substrate folder) for all the substrate dependencies in the current working directory (`./substrate-debug-kit/migration-dry-run/.cargo`). Also, you need to have the same one in your polkadot folder as well (`./polkadot/.cargo` -- I am not quite sure about the logic of these overrides, cargo warns that they are buggy, I just happen to know that this works).
+- You need to make sure that the path of all substrate dependencies is overridden. For polkadot, it is easy: `/migration-dry-run/.cargo/config` that has `path = ["../substrate"]` in it will do. Sadly, this won't cover the case of dependencies directly at `crates.io`. For example, this crate depends on `remote-externalities` from this folder, which depends on `sp-core = "2.0.0"`. The path override will not fix this. Two alternatives exist:
+	- use my (almost deprecated) node script to override deps: `node update_cargo.js local`. This will move all the dependencies of the main creates in this repo (including `remote-externalities` and `sub-storage` that we need) to point to the local substrate.
+	- Alternatively, in this crate (`./migration-dry-run/Cargo.toml`) there is a `[path.crates.io` that manually overrides all the `sp-*` and `frame-*` dependencies. This should also ensure that all substrate dependencies are pointing to the correct local one. Just make sure that this is not commented, and there's nothing more to do.
 
-- But there's more: The dependencies from within substrate-debug-kit (i.e. `remote-externalities`) also point to substrate and they need to match the rest of the substrate dependencies. Maybe there's a way to `path` override this as well, but for now I have a script for this. Simply go to the root of `substrate-debug-kit` and run `node update_cargo.js local`.
+By this point, you should have all the 3 repos with a rather singular dependency tree (`polkadot` and everything in `substrate-debug-kit`) will use `substrate`. We already know that the `substrate` and `polkadot` are compatible. There is a small chance that the `sp-*` crates in substrate are not compatible with something in `substrate-debug-kit`. This is quite rare and if so, please make an issue here.
 
 This should be it to make sure everything compiles well. Now let's look at what you can do with the code.
 

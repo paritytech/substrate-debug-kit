@@ -8,7 +8,7 @@ edition = "2018"
 [workspace]
 
 [dependencies]
-async-std = { version = "1.6.2", features = ["attributes"] }
+async-std = { version = "1.9.0", features = ["attributes"] }
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }
 sub-storage = { path = "../sub-storage" }
 log = "0.4.11"

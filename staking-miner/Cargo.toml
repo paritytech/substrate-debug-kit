@@ -7,7 +7,7 @@ edition = "2018"
 [workspace]
 
 [dependencies]
-async-std = { version = "1.6.2", features = ["attributes"] }
+async-std = { version = "1.9.0", features = ["attributes"] }
 jsonrpsee = { version = "0.1.0", features = ["ws"] }
 log = "0.4.11"
 env_logger = "0.7.1"

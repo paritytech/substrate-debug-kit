@@ -4,7 +4,7 @@ const path = require('path')
 const dirs = ["remote-externalities", "offline-election", "sub-storage", "sub-du"]
 
 const VERSION_TYPE = {
-	EXACT: "2.0.0",
+	EXACT: "2.0.1",
 	BRANCH: "master",
 	COMMIT: "6687fa111e5efaef6c91ec840dc7fb92d4a72820",
 	LOCAL: "",
