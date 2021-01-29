@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 async-std = { version = "1.6.2", features = ["attributes"] }
-jsonrpsee = { version = "0.1.0", features = ["ws"] }
+jsonrpsee = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710", features = ["ws"] }
 url = "2.1.1"
 log = "0.4.8"
 env_logger = "0.7.1"

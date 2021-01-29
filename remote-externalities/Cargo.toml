@@ -5,23 +5,22 @@ authors = ["kianenigma <kian.peymani@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-codec = { package = "parity-scale-codec", version = "1.3.0", default-features = false, features = ["derive"] }
-async-std = { version = "1.9.0" }
-jsonrpsee = { version = "0.1.0", features = ["ws"] }
-separator = "0.4.1"
-ansi_term = "0.12.1"
-env_logger = "0.7.1"
-log = "0.4.11"
+# codec = { package = "parity-scale-codec", version = "1.3.0", default-features = false, features = ["derive"] }
+jsonrpsee-types = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
+jsonrpsee-http-client = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
+jsonrpsee-ws-client = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
 
-sub-storage = { path = "../sub-storage" }
+hex-literal = "0.3.1"
+env_logger = "0.8.2"
+log = "0.4.11"
+bincode = "1.3.1"
+
 sp-io = { version = "2.0.1" }
 sp-core = { version = "2.0.1" }
-sp-externalities = { version = "0.8.1" }
 
 [dev-dependencies]
-hex-literal = "0.3.1"
-tokio-test = "0.2.1"
-frame-system = { version = "2.0.1" }
-frame-support = { version = "2.0.1" }
-pallet-staking = { version = "2.0.1" }
-sp-runtime = { version = "2.0.1" }
+tokio = { version = "1", features = ["full"] }
+
+[features]
+remote-test-kusama = []
+remote-test-polkadot = []

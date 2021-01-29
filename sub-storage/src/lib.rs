@@ -20,9 +20,12 @@
 
 use codec::Decode;
 use frame_support::StorageHasher;
-use jsonrpsee::common::{to_value as to_json_value, Params};
 use sp_core::hashing::twox_128;
 use std::fmt::Debug;
+
+use jsonrpsee_http_client::{HttpClient, HttpConfig};
+use jsonrpsee_ws_client::{WsClient, WsConfig};
+use jsonrpsee_types::jsonrpc::{Params, to_value as to_json_value};
 
 /// Helper's module.
 #[cfg(feature = "helpers")]
@@ -32,15 +35,17 @@ pub mod helpers;
 pub use sp_core::storage::{StorageData, StorageKey};
 /// The hash type used by this crate.
 pub type Hash = sp_core::hash::H256;
-/// The client type
-pub type Client = jsonrpsee::Client;
+// TODO: write a basic abstraction above the two?
+type Client = WsClient;
 
 /// Create a client
-pub async fn create_ws_client(endpoint: &str) -> Client {
-	let transport = jsonrpsee::transport::ws::WsTransportClient::new(endpoint)
-		.await
-		.expect("Failed to connect to client");
-	jsonrpsee::raw::RawClient::new(transport).into()
+pub async fn create_ws_client(endpoint: &str) -> WsClient {
+	WsClient::new(endpoint, WsConfig::default()).await.unwrap()
+}
+
+pub async fn create_http_client(endpoint: &str) -> HttpClient {
+	let config = HttpConfig { max_request_body_size: u32::max_value() };
+	HttpClient::new(endpoint, config).unwrap()
 }
 
 /// create key for a simple value.
@@ -120,6 +125,20 @@ pub async fn get_pairs(
 		.request("state_getPairs", Params::Array(vec![serialized_prefix, at]))
 		.await
 		.expect("Storage state_getPairs failed")
+}
+
+pub async fn get_pairs_http(
+	prefix: StorageKey,
+	client: &HttpClient,
+	at: Hash,
+) -> Vec<(StorageKey, StorageData)> {
+	let serialized_prefix = to_json_value(prefix).expect("StorageKey serialization infallible");
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let json_value = client
+		.request("state_getPairs", Params::Array(vec![serialized_prefix, at]))
+		.await
+		.expect("Storage state_getPairs failed");
+	jsonrpsee_types::jsonrpc::from_value(json_value).unwrap()
 }
 
 /// Enumerate all keys and values in a storage map.
@@ -265,10 +284,7 @@ pub async fn get_runtime_version(client: &Client, at: Hash) -> sp_version::Runti
 pub async fn get_storage_size(key: StorageKey, client: &Client, at: Hash) -> Option<u64> {
 	let at = to_json_value(at).expect("Block hash serialization infallible");
 	let key = to_json_value(key).expect("extrinsic serialization infallible");
-	client
-		.request("state_getStorageSize", Params::Array(vec![key, at]))
-		.await
-		.unwrap()
+	client.request("state_getStorageSize", Params::Array(vec![key, at])).await.unwrap()
 }
 
 #[cfg(test)]
@@ -276,7 +292,6 @@ mod tests {
 	use super::*;
 	use async_std::task::block_on;
 	use frame_system::AccountInfo;
-	use jsonrpsee::{raw::RawClient, transport::ws::WsTransportClient, Client};
 	use pallet_balances::AccountData;
 
 	// These must be the same as node-primitives
@@ -299,10 +314,7 @@ mod tests {
 	const ACCOUNT: &'static str = "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29";
 
 	async fn test_client() -> Client {
-		let transport = WsTransportClient::new(TEST_URI)
-			.await
-			.expect("Failed to connect to client");
-		RawClient::new(transport).into()
+		create_ws_client(TEST_URI.into()).await
 	}
 
 	#[test]
@@ -351,7 +363,7 @@ mod tests {
 		assert_eq!(size, 4);
 	}
 
-	#[ignore = "This needs a local node."]
+	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
 	#[test]
 	fn kusama_1832() {
 		// https://github.com/paritytech/polkadot/pull/1832
@@ -384,28 +396,27 @@ mod tests {
 		let client = block_on(test_client());
 		let at = block_on(get_head(&client));
 
-		assert!(block_on(get_const::<u32>(
-			&client,
-			&"ElectionsPhragmen",
-			&"DesiredMembers",
-			at
-		))
-		.is_some());
+		assert!(block_on(get_const::<u32>(&client, &"ElectionsPhragmen", &"DesiredMembers", at))
+			.is_some());
 
-		assert!(block_on(get_const::<u32>(
-			&client,
-			&"ElectionsPhragmen",
-			&"DesiredMemberss",
-			at
-		))
-		.is_none());
+		assert!(block_on(get_const::<u32>(&client, &"ElectionsPhragmen", &"DesiredMemberss", at))
+			.is_none());
 
-		assert!(block_on(get_const::<u32>(
-			&client,
-			&"ElectionsPhragmennn",
-			&"DesiredMembers",
-			at
-		))
-		.is_none());
+		assert!(block_on(get_const::<u32>(&client, &"ElectionsPhragmennn", &"DesiredMembers", at))
+			.is_none());
+	}
+
+	#[tokio::test]
+	async fn can_get_all_storage_http() {
+		let client = create_http_client("http://localhost:9933".into()).await;
+		let ws_client = create_ws_client(TEST_URI.into()).await;
+		let at = get_head(&ws_client).await;
+		let data = get_pairs_http(StorageKey(vec![]), &client, at).await;
+		assert!(data.len() > 0);
+	}
+
+	#[test]
+	fn can_get_all_storage_ws() {
+		todo!()
 	}
 }

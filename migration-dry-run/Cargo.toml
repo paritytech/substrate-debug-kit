@@ -8,17 +8,23 @@ edition = "2018"
 
 
 [dependencies]
-jsonrpsee = { version = "0.1.0", features = ["ws"] }
-async-std = { version = "1.9.0", features = ["attributes"] }
+jsonrpsee-types = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
+jsonrpsee-http-client = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
+jsonrpsee-ws-client = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
+tokio = { version = "1", features = ["full"] }
 env_logger = "0.8.2"
 log = "0.4.13"
+hex-literal = "0.3.1"
 
 node-runtime = { package = "kusama-runtime", path = "../../polkadot/runtime/kusama" }
 
+# Local deps
 remote-externalities = { path = "../remote-externalities" }
 sub-storage = { path = "../sub-storage" }
+
+# Substrate deps. It really doesn't matter we use here, if it overlaps with the patch list, it will
+# be covered.
 frame-support = { path = "../../substrate/frame/support" }
-frame-system = { path = "../../substrate/frame/system" }
 
 [workspace]
 
@@ -33,4 +39,3 @@ sp-version = { path = "../../substrate/primitives/version" }
 frame-system = { path = "../../substrate/frame/system" }
 frame-support = { path = "../../substrate/frame/support" }
 frame-metadata = { path = "../../substrate/frame/metadata" }
-

@@ -1,11 +1,10 @@
 //! Some helper functions for common substrate chains.
 
-use crate::Hash;
+use crate::{Hash, Client};
 use ansi_term::Colour;
 use codec::{Decode, Encode};
 use frame_support::{Blake2_128Concat, Twox64Concat};
 use frame_system::AccountInfo;
-use jsonrpsee::Client;
 use pallet_balances::AccountData;
 use std::fmt::Debug;
 
@@ -47,9 +46,7 @@ pub async fn get_identity<
 		crate::map_key::<Twox64Concat>(
 			b"Identity",
 			b"IdentityOf",
-			maybe_subidentity
-				.as_ref()
-				.map_or(who.as_ref(), |x| x.0.as_ref()),
+			maybe_subidentity.as_ref().map_or(who.as_ref(), |x| x.0.as_ref()),
 		),
 		client,
 		at,
@@ -63,9 +60,7 @@ pub async fn get_identity<
 		let result = match display {
 			Data::Raw(bytes) => format!(
 				"{}",
-				Colour::Yellow
-					.bold()
-					.paint(String::from_utf8(bytes).expect("Identity not utf-8"))
+				Colour::Yellow.bold().paint(String::from_utf8(bytes).expect("Identity not utf-8"))
 			),
 			_ => format!("{}", Colour::Red.bold().paint("???")),
 		};
