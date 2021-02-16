@@ -2,6 +2,12 @@
 
 ## Remote Externalities
 
+## DEPRECATED
+
+This project has been moved to substrate now and is discontinued here.
+
+---
+
 An equivalent of `sp_io::TestExternalities` that can load its state from a remote substrate
 based chain.
 
@@ -38,7 +44,7 @@ update_cargo.js exact` to switch back.
 > At this point, if there has been a breaking change in `sp-*` crates, this crate might not
 compile. Please make an issue. This is rather rare.
 
-Now we can get to the above issues again. You have two opitions:
+Now we can get to the above issues again. You have two options:
 
 1. Build a mock runtime, similar how to you would build one in a pallet test (see example
    below). The very important point here is that this mock needs to hold real values for types
@@ -49,20 +55,20 @@ Now we can get to the above issues again. You have two opitions:
 - `u128` as Balance.
 
 And most importantly the types of `my-pallet`. Once you have your `Runtime`, you can use it for
-storage type resolution and do things like `<my_pallet::Pallet<Runtime>>::funciton()` or
+storage type resolution and do things like `<my_pallet::Pallet<Runtime>>::function()` or
 `<my_pallet::StorageItem<Runtime>>::get()`.
 
 2. Finally, the second option:
 
-If you you alredy have new pallet integrated in polkadot, you can directly pull
+If you you already have new pallet integrated in polkadot, you can directly pull
 `polkadot-runtime` or `kusama-runtime` and use that, like `use polkadot_runtime::Runtime` (which
 will take a week to compile). Note that you, again, have to make sure that the substrate
 dependencies don't clash: You need a local polkadot repo next to the above two, use it to import
-the `Runtime`, and make sure there is a `.cargo/config` file in polkadot overrding substrate
+the `Runtime`, and make sure there is a `.cargo/config` file in polkadot overriding substrate
 dependencies to point to the local one.
 
 > I personally recommend building a mock runtime if you only use remote-externalities, and use a
-real runtime if you ise `migration-dry-run`.
+real runtime if you use `migration-dry-run`.
 
 #### Example
 

@@ -15,10 +15,7 @@ pub async fn is_dangling(
 ) -> bool {
 	let maybe_slashing_spans = slashing_span_of(&target, client, at).await;
 	!maybe_slashing_spans.map_or(true, |spans| {
-		println!(
-			"spans.last_nonzero_slash() = {:?}",
-			spans.last_nonzero_slash()
-		);
+		println!("spans.last_nonzero_slash() = {:?}", spans.last_nonzero_slash());
 		submitted_in >= spans.last_nonzero_slash()
 	})
 }
@@ -77,14 +74,6 @@ pub async fn run(client: &Client, opt: Opt) {
 		}
 	}
 
-	log::info!(
-		target: LOG_TARGET,
-		"✅ {} nominators have effective votes.",
-		ok
-	);
-	log::info!(
-		target: LOG_TARGET,
-		"❌ {} nominators have dangling votes.",
-		nok
-	);
+	log::info!(target: LOG_TARGET, "✅ {} nominators have effective votes.", ok);
+	log::info!(target: LOG_TARGET, "❌ {} nominators have dangling votes.", nok);
 }

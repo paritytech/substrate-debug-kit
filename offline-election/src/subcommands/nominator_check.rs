@@ -69,10 +69,7 @@ pub async fn run(client: &Client, opt: Opt, who: AccountId) {
 		if let Some(active) = active_edges.iter().find(|e| e.0 == *t) {
 			let val = crate::Currency::from(active.1);
 			let index = active.2;
-			println!(
-				"\t✅ Active {:?} ({}) / value: {:?} / index: {:?}",
-				t, ident, val, index
-			);
+			println!("\t✅ Active {:?} ({}) / value: {:?} / index: {:?}", t, ident, val, index);
 			active_bonded += active.1;
 			if index > 64 {
 				log::warn!("This nomination cannot claim its rewards.");

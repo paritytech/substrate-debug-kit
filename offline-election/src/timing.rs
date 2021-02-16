@@ -15,6 +15,6 @@ macro_rules! t_stop {
 			"⏳ {} took {}ms.",
 			stringify!($name),
 			$name.elapsed().as_millis(),
-			)
+		)
 	};
 }

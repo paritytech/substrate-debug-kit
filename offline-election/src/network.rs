@@ -46,12 +46,9 @@ impl Convert<u128, u128> for CurrencyToVoteHandler {
 
 /// Get total issuance of the chain.
 async fn get_total_issuance(client: &Client, at: Hash) -> Balance {
-	let maybe_total_issuance = storage::read::<Balance>(
-		storage::value_key(b"Balances", b"TotalIssuance"),
-		&client,
-		at,
-	)
-	.await;
+	let maybe_total_issuance =
+		storage::read::<Balance>(storage::value_key(b"Balances", b"TotalIssuance"), &client, at)
+			.await;
 
 	maybe_total_issuance.unwrap_or(0)
 }
@@ -59,10 +56,7 @@ async fn get_total_issuance(client: &Client, at: Hash) -> Balance {
 pub async fn get_validators_and_expo_at(
 	client: &Client,
 	at: Hash,
-) -> (
-	pallet_staking::EraIndex,
-	Vec<(AccountId, pallet_staking::Exposure<AccountId, Balance>)>,
-) {
+) -> (pallet_staking::EraIndex, Vec<(AccountId, pallet_staking::Exposure<AccountId, Balance>)>) {
 	use frame_support::Twox64Concat;
 	let validators = sub_storage::read::<Vec<crate::primitives::AccountId>>(
 		sub_storage::value_key(b"Session", b"Validators"),

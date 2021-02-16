@@ -195,14 +195,13 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	let ElectionResult { winners, assignments } =
 		seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
 			count,
-			0,
 			candidates.clone(),
 			all_voters
 				.iter()
 				.cloned()
 				.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
 				.collect::<Vec<_>>(),
-			// Some((iterations, 0)),
+			Some((iterations, 0)),
 		)
 		.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
@@ -216,15 +215,10 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 
 	t_start!(build_support_map_run);
 	let mut supports =
-		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).0;
+		to_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).unwrap();
 	t_stop!(build_support_map_run);
 
-	// TODO: remove once balancing is merged into set-phragmen
-	t_start!(balancing);
-	sp_npos_elections::balance_solution(&mut staked_assignments, &mut supports, 0, iterations);
-	t_stop!(balancing);
-
-	let initial_score = evaluate_support(&supports);
+	let initial_score = supports.clone().evaluate();
 
 	if reduce {
 		t_start!(reducing_solution);
@@ -232,7 +226,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		t_stop!(reducing_solution);
 		// just to check that support has NOT changed
 		let support_after_reduce =
-			build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).0;
+			to_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).unwrap();
 		assert_supports_total_equal(&support_after_reduce, &supports);
 		supports = support_after_reduce;
 	}

@@ -28,9 +28,5 @@ pub async fn run(client: &Client, config: Opt) {
 		}
 	}
 
-	log::info!(
-		target: LOG_TARGET,
-		"min-staker (score[0]) is {:?}",
-		Currency::from(min_stake)
-	);
+	log::info!(target: LOG_TARGET, "min-staker (score[0]) is {:?}", Currency::from(min_stake));
 }

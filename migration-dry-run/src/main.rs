@@ -40,9 +40,9 @@ async fn main() -> () {
 
 	let state = remote_externalities::Builder::new()
 		.cache_mode(remote_externalities::CacheMode::UseElseCreate)
-		// .cache_name(remote_externalities::CacheName::Forced(
-		// 	"Kusama,0x7f13b9c87b6ba0845ea69a4cde233f2e8979666e86fe62eeba4982da8133023c,.bin".into(),
-		// ))
+		.cache_name(remote_externalities::CacheName::Forced(
+			"Kusama,0x7f13b9c87b6ba0845ea69a4cde233f2e8979666e86fe62eeba4982da8133023c,.bin".into(),
+		))
 		.build()
 		.await;
 

@@ -164,7 +164,6 @@
 // whatever node you are connecting to. Polkadot, substrate etc.
 pub use primitives::{AccountId, Balance, BlockNumber, Hash};
 
-use jsonrpsee::Client;
 use sp_core::crypto::{set_default_ss58_version, Ss58AddressFormat};
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -181,6 +180,8 @@ pub mod subcommands;
 pub const LOG_TARGET: &'static str = "offline-election";
 
 type Currency = sub_tokens::dynamic::DynamicToken;
+
+pub(crate) type Client = sub_storage::Client;
 
 /// Offline elections scripts.
 ///
@@ -286,10 +287,6 @@ pub struct CouncilConfig {
 	/// Json output file name. dumps the results into if given.
 	#[structopt(parse(from_os_str))]
 	output: Option<PathBuf>,
-
-	/// Number of balancing rounds.
-	#[structopt(short, long, default_value = "0")]
-	iterations: usize,
 }
 
 #[async_std::main]
@@ -299,10 +296,10 @@ async fn main() -> () {
 	let mut opt = Opt::from_args();
 
 	// connect to a node.
-	let transport = jsonrpsee::transport::ws::WsTransportClient::new(&opt.uri)
-		.await
-		.expect("Failed to connect to client");
-	let client: Client = jsonrpsee::raw::RawClient::new(transport).into();
+	let client =
+		jsonrpsee_ws_client::WsClient::new(&opt.uri, jsonrpsee_ws_client::WsConfig::default())
+			.await
+			.unwrap();
 
 	// get the latest block hash
 	let head = storage::get_head(&client).await;

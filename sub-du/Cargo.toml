@@ -5,7 +5,7 @@ authors = ["kianenigma <kian.peymani@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-codec = { package = "parity-scale-codec", version = "1.3.0", default-features = false, features = ["derive"] }
+codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false, features = ["derive"] }
 async-std = { version = "1.9.0", features = ["attributes"] }
 jsonrpsee-types = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
 jsonrpsee-http-client = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
@@ -17,7 +17,7 @@ log = "0.4.11"
 structopt = { version = "0.3" }
 
 sub-storage = { path = "../sub-storage", features = ["helpers"] }
-frame-metadata = { version = "12.0.1" }
+frame-metadata = { version = "13.0.0" }
 
 [features]
 default = []

@@ -1,5 +1,11 @@
 //! # Remote Externalities
 //!
+//! # DEPRECATED
+//!
+//! This project has been moved to substrate now and is discontinued here.
+//!
+//! ---
+//!
 //! An equivalent of `sp_io::TestExternalities` that can load its state from a remote substrate
 //! based chain.
 //!
@@ -452,7 +458,7 @@ mod tests {
 	pub struct TestRuntime;
 
 	#[tokio::test]
-	// #[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
+	#[ignore = "needs remove node"]
 	async fn can_build_system() {
 		let _ = env_logger::Builder::from_default_env()
 			.format_module_path(false)
@@ -463,23 +469,7 @@ mod tests {
 	}
 
 	#[tokio::test]
-	async fn can_load_cache() {
-		let _ = env_logger::Builder::from_default_env()
-			.format_module_path(false)
-			.format_level(true)
-			.try_init();
-
-		Builder::new()
-			.uri(TEST_URI.into())
-			.cache_mode(CacheMode::UseElseCreate)
-			.cache_name(CacheName::Forced("test_cache".into()))
-			.build()
-			.await
-			.execute_with(|| {});
-	}
-
-	#[tokio::test]
-	// #[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
+	#[ignore = "needs remove node"]
 	async fn can_create_cache() {
 		let _ = env_logger::Builder::from_default_env()
 			.format_module_path(false)
@@ -509,13 +499,18 @@ mod tests {
 	}
 
 	#[tokio::test]
-	// #[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
+	#[ignore = "needs remove node"]
 	async fn can_build_all() {
 		let _ = env_logger::Builder::from_default_env()
 			.format_module_path(true)
 			.format_level(true)
 			.try_init();
 
-		Builder::new().uri(TEST_URI.into()).build().await.execute_with(|| {});
+		Builder::new()
+			.uri(TEST_URI.into())
+			.cache_mode(CacheMode::UseElseCreate)
+			.build()
+			.await
+			.execute_with(|| {});
 	}
 }

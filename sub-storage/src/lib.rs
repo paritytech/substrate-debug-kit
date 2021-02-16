@@ -36,7 +36,7 @@ pub use sp_core::storage::{StorageData, StorageKey};
 /// The hash type used by this crate.
 pub type Hash = sp_core::hash::H256;
 // TODO: write a basic abstraction above the two?
-type Client = WsClient;
+pub type Client = WsClient;
 
 /// Create a client
 pub async fn create_ws_client(endpoint: &str) -> WsClient {

@@ -61,10 +61,7 @@ impl std::fmt::Display for Module {
 
 impl Module {
 	fn new(name: String) -> Self {
-		Self {
-			name,
-			..Default::default()
-		}
+		Self { name, ..Default::default() }
 	}
 }
 
@@ -101,12 +98,7 @@ struct Storage {
 impl std::fmt::Display for Storage {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let item_style = Style::new().italic();
-		write!(
-			f,
-			"{} => {}",
-			item_style.paint(self.name.clone()),
-			self.item
-		)
+		write!(f, "{} => {}", item_style.paint(self.name.clone()), self.item)
 	}
 }
 
@@ -153,18 +145,13 @@ struct Opt {
 
 #[async_std::main]
 async fn main() -> () {
-	env_logger::Builder::from_default_env()
-		.format_module_path(false)
-		.format_level(true)
-		.init();
+	env_logger::Builder::from_default_env().format_module_path(false).format_level(true).init();
 
 	let opt = Opt::from_args();
 
 	// connect to a node.
-	let transport = jsonrpsee::transport::ws::WsTransportClient::new(&opt.uri)
-		.await
-		.expect("Failed to connect to client");
-	let client: jsonrpsee::Client = jsonrpsee::raw::RawClient::new(transport).into();
+	use jsonrpsee_ws_client::{WsClient, WsConfig};
+	let client = WsClient::new(&opt.uri, WsConfig::default()).await.unwrap();
 
 	let mut modules: Vec<Module> = vec![];
 
@@ -173,10 +160,7 @@ async fn main() -> () {
 	let at = opt.at.unwrap_or(head);
 	let runtime = sub_storage::get_runtime_version(&client, at).await;
 
-	println!(
-		"Scraping at block {:?} of {}({})",
-		at, runtime.spec_name, runtime.spec_version,
-	);
+	println!("Scraping at block {:?} of {}({})", at, runtime.spec_name, runtime.spec_version,);
 
 	let raw_metadata = get_metadata(&client, at).await.0;
 	let prefixed_metadata = <RuntimeMetadataPrefixed as codec::Decode>::decode(&mut &*raw_metadata)
@@ -248,10 +232,7 @@ async fn main() -> () {
 			}
 			module_info.items.sort_by_key(|x| x.size);
 			module_info.items.reverse();
-			println!(
-				"Scraped module {}. Total size {}.",
-				module_info.name, module_info.size,
-			);
+			println!("Scraped module {}. Total size {}.", module_info.name, module_info.size,);
 			if opt.progress {
 				print!("{}", module_info);
 			}

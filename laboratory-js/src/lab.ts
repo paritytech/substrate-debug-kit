@@ -25,24 +25,8 @@ export async function allNominators() {
 	})
 }
 
-export async function perbillTest() {
-	let endpoint = "ws://localhost::9944"
-	const provider = new WsProvider(endpoint);
-	const api = await ApiPromise.create({ provider })
-
-	const { commission } = await api.query.staking.validators("5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty")
-	console.log(commission.unwrap().toHex());
-	console.log(commission.unwrap().toHuman());
-	console.log(commission.unwrap().toU8a());
-	console.log(commission.unwrap().toJSON());
-	console.log(commission.unwrap().toNumber());
-	console.log(commission.unwrap().toBn());
-	console.log(commission.unwrap().toString());
-
-}
-
 export async function latestElectionSubmissions() {
-	let endpoint = "ws://localhost:9944"
+	let endpoint = "ws://localhost::9944"
 	const provider = new WsProvider(endpoint);
 	const api = await ApiPromise.create({ provider })
 
@@ -50,13 +34,17 @@ export async function latestElectionSubmissions() {
 	let now = head
 	console.log(`starting at ${now}`);
 	let _electionStatus = await api.query.staking.eraElectionStatus.at(now);
+	let _queedScore = await api.query.staking.queuedScore.at(now);
 	while (true) {
 		let block = await api.rpc.chain.getBlock(now);
+		let header = await api.derive.chain.getHeader(now)
+		let number = block.block.header.number;
 		let extrinsics = block.block.extrinsics;
 		let events = await api.query.system.events.at(now)
-		let maximum_weight = api.consts.system.maximumBlockWeight.toNumber()
-		let maximum_length = api.consts.system.maximumBlockLength.toNumber()
+		// let maximum_weight = api.consts.system.blockWeights.maxBlock;
+		// let maximum_length = api.consts.system.blockLength.max;
 		let electionStatus = await api.query.staking.eraElectionStatus.at(now);
+		let queedScore = await api.query.staking.queuedScore.at(now);
 
 		for (let ext of extrinsics) {
 			if (ext.meta.name.toString().includes("submit_election_solution")) {
@@ -65,29 +53,34 @@ export async function latestElectionSubmissions() {
 				let weight = await api.query.system.blockWeight.at(now)
 				for (let event of events) {
 					if (event.event.meta.name.includes("SolutionStored")) {
-						console.log(`✅ Found a correct ${ext.meta.name} for era ${era.toHuman()} => score ${ext.args[2]}`)
-						console.log(`⌚️ Weight = ${weight} (${weight['normal'].toNumber() / maximum_weight}). Len = ${ext.encodedLength} (${ext.encodedLength / maximum_length})`)
+						console.log(`[${number}] ✅ Found a correct ${ext.meta.name} for era ${era.toHuman()} at block ${number} by ${header?.author} => score ${ext.args[2]}`)
+						// console.log(weight, maximum_weight, maximum_length);
+						// console.log(`⌚️ Weight = ${weight} (${weight.normal / maximum_weight}). Len = ${ext.encodedLength} (${ext.encodedLength / maximum_length})`)
 						found = true
 						break;
 					}
 				}
 				if (!found) {
-					console.log(`❌ Found a failed ${ext.meta.name} for era ${era.toHuman()} => score ${ext.args[2]}. Weight = ${weight}. Len = ${ext.encodedLength}`)
+					console.log(`[${number}] ❌ Found a failed ${ext.meta.name} for era ${era.toHuman()} => score ${ext.args[2]}. Weight = ${weight}. Len = ${ext.encodedLength}`)
 				}
 			}
 		}
 
 		for (let event of events) {
 			if (event.event.meta.name.includes("StakingElection")) {
-				console.log(`🤑 Staking election closed at ${now} (${block.block.header.number}) with compute ${event.event.data.toHuman()}`)
+				console.log(`[${number}] 🤑 Staking election closed with compute ${event.event.data.toHuman()}`)
 				break;
 			}
 		}
 
-		if (_electionStatus.isClose !== electionStatus.isClose) {
-			console.log(`change in election status at ${(await api.rpc.chain.getHeader(now)).number}. previous ${_electionStatus}, now ${electionStatus}`)
-			_electionStatus = electionStatus
-		}
+		// if (_electionStatus.isClose !== electionStatus.isClose) {
+		// 	console.log(`[${number}] change in election status. previous ${_electionStatus}, now ${electionStatus}`)
+		// 	_electionStatus = electionStatus
+		// }
+		// if (!_queedScore.eq(queedScore)) {
+		// 	console.log(`[${number}] change in queued score. previous ${_queedScore}, now ${queedScore}`)
+		// 	_queedScore = queedScore
+		// }
 
 		now = block.block.header.parentHash
 	}

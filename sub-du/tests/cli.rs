@@ -21,6 +21,4 @@ fn sub_du_starts_to_scrape_normal() {
 	assert!(String::from_utf8_lossy(&stdout).contains("of kusama("));
 	#[cfg(feature = "remote-test-polkadot")]
 	assert!(String::from_utf8_lossy(&stdout).contains("of polkadot("));
-	#[cfg(not(any(feature = "remote-test-kusama", feature = "remote-test-polkadot")))]
-	assert!(String::from_utf8_lossy(&stdout).contains("of kusama("));
 }

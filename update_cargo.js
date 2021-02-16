@@ -4,15 +4,15 @@ const path = require('path')
 const dirs = ["remote-externalities", "offline-election", "sub-storage", "sub-du"]
 
 const VERSION_TYPE = {
-	EXACT: "2.0.1",
+	EXACT: "3.0.0",
 	BRANCH: "master",
 	COMMIT: "6687fa111e5efaef6c91ec840dc7fb92d4a72820",
 	LOCAL: "",
 }
 
 const SPECIAL_VERSIONS = {
-	"frame-metadata": "12.0.1",
-	"sp-externalities": "0.8.1",
+	"frame-metadata": "13.0.0",
+	"sp-externalities": "0.9.0",
 };
 
 const SUB_FRAME_PACKAGES = ['reward-curve']

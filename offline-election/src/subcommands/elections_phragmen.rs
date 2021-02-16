@@ -67,7 +67,6 @@ async fn get_voters_and_budget(
 pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 	let at = opt.at.unwrap();
 	let verbosity = opt.verbosity;
-	let iterations = conf.iterations;
 	let desired_members =
 		sub_storage::get_const::<u32>(client, "ElectionsPhragmen", "DesiredMembers", at)
 			.await
@@ -77,9 +76,7 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 		sub_storage::get_const::<u32>(client, "ElectionsPhragmen", "DesiredRunnersUp", at)
 			.await
 			.expect("DesiredRunnersUp const must exist.");
-	let count = conf
-		.count
-		.unwrap_or_else(|| (desired_members + desired_runners_up) as usize);
+	let count = conf.count.unwrap_or_else(|| (desired_members + desired_runners_up) as usize);
 
 	let to_votes = |b: Balance| -> VoteWeight {
 		<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(b)
@@ -109,23 +106,14 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 
 	// run phragmen
 	t_start!(phragmen_run);
-	let ElectionResult {
-		winners,
-		assignments,
-	} = seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
-		count,
-		0,
-		candidates,
-		all_voters.clone(),
-		// None,
-	)
+	let ElectionResult { winners, assignments } = seq_phragmen::<
+		AccountId,
+		pallet_staking::ChainAccuracy,
+	>(count, candidates, all_voters.clone(), None)
 	.expect("Phragmen failed to elect.");
 	t_stop!(phragmen_run);
 
-	let elected_stashes = winners
-		.iter()
-		.map(|(s, _)| s.clone())
-		.collect::<Vec<AccountId>>();
+	let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
 
 	t_start!(ratio_into_staked_run);
 	let staked_assignments = assignment_ratio_to_staked(assignments.clone(), weight_of);
@@ -133,13 +121,8 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 
 	t_start!(build_support_map_run);
 	let supports =
-		build_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).0;
+		to_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).unwrap();
 	t_stop!(build_support_map_run);
-
-	if iterations > 0 {
-		// prepare and run post-processing.
-		unimplemented!()
-	}
 
 	log::info!(target: LOG_TARGET, "👨🏻‍⚖️ Members:");
 	for (i, s) in winners.iter().enumerate() {
@@ -167,29 +150,19 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 		}
 	}
 
-	let new_members = winners
-		.into_iter()
-		.take(desired_members as usize)
-		.collect::<Vec<_>>();
-	let mut prime_votes: Vec<_> = new_members
-		.iter()
-		.map(|(c, _)| (c, VoteWeight::zero()))
-		.collect();
+	let new_members = winners.into_iter().take(desired_members as usize).collect::<Vec<_>>();
+	let mut prime_votes: Vec<_> =
+		new_members.iter().map(|(c, _)| (c, VoteWeight::zero())).collect();
 	for (_, stake, targets) in all_voters.into_iter() {
-		for (votes, who) in targets
-			.iter()
-			.enumerate()
-			.map(|(votes, who)| ((16 - votes) as u32, who))
+		for (votes, who) in
+			targets.iter().enumerate().map(|(votes, who)| ((16 - votes) as u32, who))
 		{
 			if let Ok(i) = prime_votes.binary_search_by_key(&who, |k| k.0) {
 				prime_votes[i].1 += stake * votes as VoteWeight;
 			}
 		}
 	}
-	let prime = prime_votes
-		.into_iter()
-		.max_by_key(|x| x.1)
-		.map(|x| x.0.clone());
+	let prime = prime_votes.into_iter().max_by_key(|x| x.1).map(|x| x.0.clone());
 
 	log::info!(target: LOG_TARGET, "👑 Prime: {:?}", prime);
 }
