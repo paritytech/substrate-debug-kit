@@ -22,6 +22,13 @@ struct Staker {
 	stake: Balance,
 }
 
+// TODO: remove and use the new one once runtime 0.29 is there.
+#[derive(codec::Decode, Clone, Debug)]
+struct OldValidatorPrefs {
+	#[codec(compact)]
+	pub commission: sp_runtime::Perbill,
+}
+
 fn assert_supports_total_equal(s1: &SupportMap<AccountId>, s2: &SupportMap<AccountId>) {
 	assert!(s1.iter().all(|(v, s)| s2.get(v).unwrap().total == s.total))
 }
@@ -34,7 +41,7 @@ pub async fn get_current_era(client: &Client, at: Hash) -> EraIndex {
 }
 
 async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
-	storage::enumerate_map::<AccountId, ValidatorPrefs>(MODULE, b"Validators", client, at)
+	storage::enumerate_map::<AccountId, OldValidatorPrefs>(MODULE, b"Validators", client, at)
 		.await
 		.expect("Staking::validators should be enumerable.")
 		.into_iter()
@@ -238,7 +245,10 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		let support = supports.get(&s).unwrap();
 		let other_count = support.voters.len();
 		let self_stake = support.voters.iter().filter(|(v, _)| v == s).collect::<Vec<_>>();
-		assert!(self_stake.len() == 1);
+		assert!(self_stake.len() <= 1);
+		if self_stake.is_empty() {
+			println!("⁉️ Self stake for this validator has been removed, seemingly.")
+		}
 		println!(
 			"#{} --> {} [{:?}] [total backing = {:?} ({} voters)] [own backing = {:?}]",
 			i + 1,
@@ -246,7 +256,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 			s,
 			Currency::from(support.total),
 			other_count,
-			Currency::from(self_stake[0].1),
+			self_stake.get(0).map(|s| s.1).map(Currency::from),
 		);
 
 		if verbosity >= 1 {

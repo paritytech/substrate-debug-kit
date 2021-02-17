@@ -296,10 +296,15 @@ async fn main() -> () {
 	let mut opt = Opt::from_args();
 
 	// connect to a node.
-	let client =
-		jsonrpsee_ws_client::WsClient::new(&opt.uri, jsonrpsee_ws_client::WsConfig::default())
-			.await
-			.unwrap();
+	let client = jsonrpsee_ws_client::WsClient::new(
+		&opt.uri,
+		jsonrpsee_ws_client::WsConfig {
+			max_request_body_size: 1024 * 1024 * 1024, // 1GB..
+			..Default::default()
+		},
+	)
+	.await
+	.unwrap();
 
 	// get the latest block hash
 	let head = storage::get_head(&client).await;
@@ -323,6 +328,9 @@ async fn main() -> () {
 	if address_format.eq(&Ss58AddressFormat::PolkadotAccount) {
 		sub_tokens::dynamic::set_name(&"DOT");
 		sub_tokens::dynamic::set_decimal_points(10_000_000_000);
+	} else if address_format.eq(&Ss58AddressFormat::KusamaAccount) {
+		sub_tokens::dynamic::set_name(&"KSM");
+		sub_tokens::dynamic::set_decimal_points(1000_000_000_000);
 	}
 
 	// set total issuance
