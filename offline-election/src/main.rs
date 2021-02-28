@@ -100,9 +100,20 @@
 //!     staking                Run the staking election
 //!     validator-check        The general checkup of a validators
 //! ```
-//! ## Install
 //!
-//! TODO:
+//! ## Overriding data
+//!
+//! You can override voters and candidates in both staking and council election py passing a `-m` or
+//! `--manual-override` flag. This must point to a json file that contains the following keys:
+//! 1. `voters`: the new voters to be added.
+//! 2. `candidates`: the new candidates to be added.
+//! 3. `voters_remove`: voters to be removed.
+//! 4. `candidates_remove`: candidates to be removed.
+//!
+//! Note that first the incomings are added, and then any voter/candidate in the outgoing list is
+//! stripped out.
+//!
+//! Find an example [here](./override_example.json).
 //!
 //! ## Example usage
 //!
