@@ -168,18 +168,11 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		);
 	}
 
-	t_start!(data_scrape);
 	// stash key of all wannabe candidates.
-	let candidates = get_candidates(client, at).await;
+	let mut candidates = get_candidates(client, at).await;
 
 	// stash key of current voters, including maybe self vote.
-	let mut all_voters = get_voters(&client, at).await;
-
-	// add self-vote
-	candidates.iter().for_each(|v| {
-		let self_vote = (v.clone(), vec![v.clone()]);
-		all_voters.push(self_vote);
-	});
+	let all_voters = get_voters(&client, at).await;
 
 	// get the slashable balance of every entity
 	let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
@@ -188,7 +181,6 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		let staker_info = get_staker_info_entry(&stash, &client, at).await;
 		staker_infos.insert(stash.clone(), staker_info);
 	}
-	t_stop!(data_scrape);
 
 	let slashable_balance = |who: &AccountId| -> Balance { staker_infos.get(who).unwrap().stake };
 	let slashable_balance_votes = |who: &AccountId| -> VoteWeight {
@@ -197,17 +189,67 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		)
 	};
 
+	let mut all_voters_and_stake = all_voters
+		.into_iter()
+		.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
+		.collect::<Vec<_>>();
+
+	if let Some(path) = conf.manual_override {
+		#[derive(serde::Serialize, serde::Deserialize)]
+		struct Override {
+			pub voters: Vec<(AccountId, u64, Vec<AccountId>)>,
+			pub voters_remove: Vec<AccountId>,
+			pub candidates: Vec<AccountId>,
+			pub candidates_remove: Vec<AccountId>,
+		}
+
+		let file = std::fs::read(path).unwrap();
+		let json_str = std::str::from_utf8(file.as_ref()).unwrap();
+		let manual: Override = serde_json::from_str(json_str).unwrap();
+
+		// add any additional candidates
+		manual.candidates.iter().for_each(|c| {
+			if candidates.contains(c) {
+				println!("manual override: {:?} is already a candidate.", c);
+			} else {
+				println!("manual override: {:?} is added as candidate.", c);
+				candidates.push(c.clone())
+			}
+		});
+		// remove any that are in removal list.
+		candidates.retain(|c| !manual.candidates_remove.contains(c));
+
+		// add any new votes
+		manual.voters.iter().for_each(|v| {
+			if let Some(mut already_existing_voter) =
+				all_voters_and_stake.iter_mut().find(|vv| vv.0 == v.0)
+			{
+				println!("manual override: {:?} is already a voter. Overriding votes.", v.0);
+				already_existing_voter.1 = v.1;
+				already_existing_voter.2 = v.2.clone();
+			} else {
+				println!("manual override: {:?} is added as voters.", v.0);
+				all_voters_and_stake.push(v.clone())
+			}
+		});
+
+		// remove any of them
+		all_voters_and_stake.retain(|v| !manual.voters_remove.contains(&v.0));
+	}
+
+	// add self-vote
+	candidates.iter().for_each(|v| {
+		let self_vote = (v.clone(), slashable_balance_votes(&v), vec![v.clone()]);
+		all_voters_and_stake.push(self_vote);
+	});
+
 	// run phragmen
 	t_start!(phragmen_run);
 	let ElectionResult { winners, assignments } =
 		seq_phragmen::<AccountId, pallet_staking::ChainAccuracy>(
 			count,
 			candidates.clone(),
-			all_voters
-				.iter()
-				.cloned()
-				.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
-				.collect::<Vec<_>>(),
+			all_voters_and_stake.clone(),
 			Some((iterations, 0)),
 		)
 		.expect("Phragmen failed to elect.");
@@ -304,7 +346,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	log::info!(
 		target: LOG_TARGET,
 		"nominator intentions count {:?}",
-		all_voters.len() - candidates.len(),
+		all_voters_and_stake.len() - candidates.len(),
 	);
 	log::info!(
 		target: LOG_TARGET,

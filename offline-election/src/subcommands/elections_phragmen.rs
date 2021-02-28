@@ -5,12 +5,12 @@ use crate::{
 };
 use sp_npos_elections::*;
 use sp_runtime::traits::{Convert, Zero};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::from_utf8, string};
 
 const MODULE: &[u8] = b"PhragmenElection";
 
 async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
-	let mut members = storage::read::<Vec<(AccountId, Balance)>>(
+	let mut members = storage::read::<Vec<(AccountId, Balance, Balance)>>(
 		storage::value_key(MODULE, b"Members"),
 		client,
 		at,
@@ -18,10 +18,10 @@ async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 	.await
 	.expect("Members must exist")
 	.into_iter()
-	.map(|(m, _)| m)
+	.map(|(m, _, _)| m)
 	.collect::<Vec<AccountId>>();
 
-	let runners = storage::read::<Vec<(AccountId, Balance)>>(
+	let runners = storage::read::<Vec<(AccountId, Balance, Balance)>>(
 		storage::value_key(MODULE, b"RunnersUp"),
 		client,
 		at,
@@ -29,13 +29,19 @@ async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 	.await
 	.expect("Runners-up must exists")
 	.into_iter()
-	.map(|(m, _)| m)
+	.map(|(m, _, _)| m)
 	.collect::<Vec<AccountId>>();
 
-	let candidates =
-		storage::read::<Vec<AccountId>>(storage::value_key(MODULE, b"Candidates"), client, at)
-			.await
-			.unwrap_or_default();
+	let candidates = storage::read::<Vec<(AccountId, Balance)>>(
+		storage::value_key(MODULE, b"Candidates"),
+		client,
+		at,
+	)
+	.await
+	.unwrap_or_default()
+	.into_iter()
+	.map(|(c, _)| c)
+	.collect::<Vec<_>>();
 
 	log::trace!(
 		target: LOG_TARGET,
@@ -55,12 +61,14 @@ async fn get_voters_and_budget(
 	client: &Client,
 	at: Hash,
 ) -> Vec<(AccountId, Balance, Vec<AccountId>)> {
-	storage::enumerate_map::<AccountId, (Balance, Vec<AccountId>)>(MODULE, b"Voting", client, at)
-		.await
-		.unwrap()
-		.into_iter()
-		.map(|(n, (b, t))| (n, b, t))
-		.collect::<Vec<_>>()
+	storage::enumerate_map::<AccountId, (Vec<AccountId>, Balance, Balance)>(
+		MODULE, b"Voting", client, at,
+	)
+	.await
+	.unwrap()
+	.into_iter()
+	.map(|(n, (t, b, _))| (n, b, t))
+	.collect::<Vec<_>>()
 }
 
 /// Main run function of the sub-command.
@@ -84,14 +92,59 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 
 	t_start!(data_scrape);
 	// all candidates
-	let candidates = get_candidates(client, at).await;
+	let mut candidates = get_candidates(client, at).await;
 
 	// all voters.
-	let all_voters = get_voters_and_budget(&client, at)
+	let mut all_voters = get_voters_and_budget(&client, at)
 		.await
 		.into_iter()
 		.map(|(n, b, t)| (n, to_votes(b), t))
 		.collect::<Vec<_>>();
+
+	if let Some(path) = conf.manual_override {
+		#[derive(serde::Serialize, serde::Deserialize)]
+		struct Override {
+			pub voters: Vec<(AccountId, u64, Vec<AccountId>)>,
+			pub voters_remove: Vec<AccountId>,
+			pub candidates: Vec<AccountId>,
+			pub candidates_remove: Vec<AccountId>,
+		}
+
+		let file = std::fs::read(path).unwrap();
+		let json_str = std::str::from_utf8(file.as_ref()).unwrap();
+		let manual: Override = serde_json::from_str(json_str).unwrap();
+
+		// add any additional candidates
+		manual.candidates.iter().for_each(|c| {
+			if candidates.contains(c) {
+				log::warn!(target: LOG_TARGET, "manual override: {:?} is already a candidate.", c);
+			} else {
+				log::warn!(target: LOG_TARGET, "manual override: {:?} is added as candidate.", c);
+				candidates.push(c.clone())
+			}
+		});
+		// remove any that are in removal list.
+		candidates.retain(|c| !manual.candidates_remove.contains(c));
+
+		// add any new votes
+		manual.voters.iter().for_each(|v| {
+			if let Some(mut already_existing_voter) = all_voters.iter_mut().find(|vv| vv.0 == v.0) {
+				log::warn!(
+					target: LOG_TARGET,
+					"manual override: {:?} is already a voter. Overriding votes.",
+					v.0,
+				);
+				already_existing_voter.1 = v.1;
+				already_existing_voter.2 = v.2.clone();
+			} else {
+				log::warn!(target: LOG_TARGET, "manual override: {:?} is added as voters.", v.0);
+				all_voters.push(v.clone())
+			}
+		});
+
+		// remove any of them
+		all_voters.retain(|v| !manual.voters_remove.contains(&v.0));
+	}
 
 	// budget of each voter
 	let mut voter_weight: BTreeMap<AccountId, VoteWeight> = BTreeMap::new();
@@ -151,18 +204,23 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 	}
 
 	let new_members = winners.into_iter().take(desired_members as usize).collect::<Vec<_>>();
-	let mut prime_votes: Vec<_> =
-		new_members.iter().map(|(c, _)| (c, VoteWeight::zero())).collect();
+	let mut prime_votes: Vec<_> = new_members.iter().map(|(c, _)| (c, Balance::zero())).collect();
 	for (_, stake, targets) in all_voters.into_iter() {
 		for (votes, who) in
 			targets.iter().enumerate().map(|(votes, who)| ((16 - votes) as u32, who))
 		{
 			if let Ok(i) = prime_votes.binary_search_by_key(&who, |k| k.0) {
-				prime_votes[i].1 += stake * votes as VoteWeight;
+				prime_votes[i].1 += (stake as Balance) * (votes as Balance);
 			}
 		}
 	}
 	let prime = prime_votes.into_iter().max_by_key(|x| x.1).map(|x| x.0.clone());
 
-	log::info!(target: LOG_TARGET, "👑 Prime: {:?}", prime);
+	if let Some(prime) = prime {
+		log::info!(
+			target: LOG_TARGET,
+			"👑 Prime: {}",
+			storage::helpers::get_identity::<AccountId, Balance>(prime.as_ref(), &client, at).await
+		);
+	}
 }

@@ -1,28 +1,47 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
+import BN from "bn.js";
 
-export async function allNominators() {
+export async function stakingReport() {
+	let endpoint = "ws://localhost::9944"
+	const provider = new WsProvider(endpoint);
+	const api = await ApiPromise.create({ provider })
+
+	let allNominators = await api.query.staking.nominators.keys();
+	let allLedgers = await api.query.staking.ledger.entries();
+	let allBonded = await api.query.staking.bonded.entries();
+
+	console.log(`all nominators = ${allNominators.length}`)
+	console.log(`all ledgers ${allLedgers.length}`)
+	console.log(`all bonded ${allBonded.length}`)
+}
+
+export async function dustNominators() {
 	let endpoint = "ws://localhost::9944"
 	const provider = new WsProvider(endpoint);
 	const api = await ApiPromise.create({ provider })
 
 	let entries = await api.query.staking.nominators.keys()
+	console.log(entries.length)
 
 	let stakers = []
-	for (let x of entries.slice(0, 10)) {
+	for (let x of entries) {
 		let k = x.toU8a().slice(-32)
 		let ctrl = (await api.query.staking.bonded(k)).unwrap()
 		let ledger = (await api.query.staking.ledger(ctrl)).unwrapOrDefault()
+		let nomination = await api.query.staking.nominators(k)
 		let stake = ledger.active
-		stakers.push({who: x, stake: stake})
+		stakers.push({ who: x, stake: stake, nomination, ledger })
 	}
 	stakers.sort((a, b) => {
-		console.log(`${a.stake.toHuman()}.stake.toBn() > ${b.stake.toHuman()}.stake.toBn() = ${a.stake.toBn() > b.stake.toBn()}`)
-		if (a.stake.toBn() > b.stake.toBn()) { return 1 } else if (a.stake.toBn() < b.stake.toBn()) { return -1 } else { return 0 }
+		if (a.stake.toBn().gt(b.stake.toBn())) { return 1 } else if (a.stake.toBn().lt(b.stake.toBn())) { return -1 } else { return 0 }
 	})
 
-	stakers.forEach(({ who, stake }, _) => {
-		console.log(who.toHuman(), stake.toHuman())
+	stakers.reverse().forEach(({ who, stake, nomination, ledger }, _) => {
+		if (stake.eq(new BN(0)) && ledger.unlocking.length == 0) {
+			console.log(who.toHuman(), stake.toHuman(), nomination.toHuman(), ledger.toHuman())
+		}
 	})
+	console.log('done')
 }
 
 export async function latestElectionSubmissions() {

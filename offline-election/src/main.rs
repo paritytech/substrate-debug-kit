@@ -274,6 +274,10 @@ pub struct StakingConfig {
 	/// If reduce is applied to the output.
 	#[structopt(short, long, parse(from_flag))]
 	reduce: bool,
+
+	/// The override file to interpret
+	#[structopt(short, long, parse(from_os_str))]
+	manual_override: Option<PathBuf>,
 }
 
 /// Arguments that can be passed to the council sub-command.
@@ -287,6 +291,10 @@ pub struct CouncilConfig {
 	/// Json output file name. dumps the results into if given.
 	#[structopt(parse(from_os_str))]
 	output: Option<PathBuf>,
+
+	/// The override file to interpret
+	#[structopt(short, long, parse(from_os_str))]
+	manual_override: Option<PathBuf>,
 }
 
 #[async_std::main]
