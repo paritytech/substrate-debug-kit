@@ -15,13 +15,6 @@ use std::{collections::BTreeMap, convert::TryInto};
 
 const MODULE: &[u8] = b"Staking";
 
-/// A staker
-#[derive(Debug, Clone, Default)]
-struct Staker {
-	ctrl: Option<AccountId>,
-	stake: Balance,
-}
-
 // TODO: remove and use the new one once runtime 0.29 is there.
 #[derive(codec::Decode, Clone, Debug)]
 struct OldValidatorPrefs {
@@ -34,7 +27,7 @@ fn assert_supports_total_equal(s1: &SupportMap<AccountId>, s2: &SupportMap<Accou
 }
 
 /// Get the current era.
-pub async fn get_current_era(client: &Client, at: Hash) -> EraIndex {
+pub(crate) async fn get_current_era(client: &Client, at: Hash) -> EraIndex {
 	storage::read::<EraIndex>(storage::value_key(MODULE, b"CurrentEra"), client, at)
 		.await
 		.expect("CurrentEra must exist")
@@ -49,7 +42,26 @@ async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 		.collect::<Vec<AccountId>>()
 }
 
-async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>)> {
+async fn stake_of(stash: &AccountId, client: &Client, at: Hash) -> Balance {
+	let ctrl = storage::read::<AccountId>(
+		storage::map_key::<frame_support::Twox64Concat>(MODULE, b"Bonded", stash.as_ref()),
+		&client,
+		at,
+	)
+	.await
+	.expect("All stashes must have 'Bonded' storage.");
+
+	storage::read::<StakingLedger<AccountId, Balance>>(
+		storage::map_key::<frame_support::Blake2_128Concat>(MODULE, b"Ledger", ctrl.as_ref()),
+		&client,
+		at,
+	)
+	.await
+	.expect("All controllers must have a 'Ledger' storage")
+	.active
+}
+
+async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, VoteWeight, Vec<AccountId>)> {
 	let nominators: Vec<(AccountId, Nominations<AccountId>)> = storage::enumerate_map::<
 		AccountId,
 		Nominations<AccountId>,
@@ -64,8 +76,6 @@ async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>
 		let submitted_in = n.submitted_in;
 		let targets = n.targets;
 		let mut filtered_targets = vec![];
-		// TODO: move back to closures and retain, but async-std::block_on can't work well here for
-		// whatever reason. Or move to streams?
 		for target in targets.iter() {
 			let maybe_slashing_spans = slashing_span_of(&target, client, at).await;
 			if maybe_slashing_spans.map_or(true, |spans| submitted_in >= spans.last_nonzero_slash())
@@ -83,34 +93,15 @@ async fn get_voters(client: &Client, at: Hash) -> Vec<(AccountId, Vec<AccountId>
 			who,
 		);
 
-		result.push((who, targets));
+		let stake = stake_of(&who, client, at).await;
+		result.push((who, to_vote_weight(stake), targets));
 	}
 
 	result
 }
 
-async fn get_staker_info_entry(stash: &AccountId, client: &Client, at: Hash) -> Staker {
-	let ctrl = storage::read::<AccountId>(
-		storage::map_key::<frame_support::Twox64Concat>(MODULE, b"Bonded", stash.as_ref()),
-		&client,
-		at,
-	)
-	.await
-	.expect("All stashes must have 'Bonded' storage.");
-
-	let ledger = storage::read::<StakingLedger<AccountId, Balance>>(
-		storage::map_key::<frame_support::Blake2_128Concat>(MODULE, b"Ledger", ctrl.as_ref()),
-		&client,
-		at,
-	)
-	.await
-	.expect("All controllers must have a 'Ledger' storage");
-
-	Staker { ctrl: Some(ctrl), stake: ledger.active }
-}
-
 /// Get the slashing span of a voter stash.
-pub async fn slashing_span_of(
+pub(crate) async fn slashing_span_of(
 	stash: &AccountId,
 	client: &Client,
 	at: Hash,
@@ -150,6 +141,10 @@ async fn get_validator_count(client: &Client, at: Hash) -> u32 {
 		.unwrap_or(50)
 }
 
+fn to_vote_weight(balance: Balance) -> VoteWeight {
+	<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(balance)
+}
+
 /// Main run function of the sub-command.
 pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	let at = opt.at.unwrap();
@@ -172,35 +167,15 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	let mut candidates = get_candidates(client, at).await;
 
 	// stash key of current voters, including maybe self vote.
-	let all_voters = get_voters(&client, at).await;
-
-	// get the slashable balance of every entity
-	let mut staker_infos: BTreeMap<AccountId, Staker> = BTreeMap::new();
-
-	for stash in candidates.iter().chain(all_voters.iter().map(|(s, _)| s)) {
-		let staker_info = get_staker_info_entry(&stash, &client, at).await;
-		staker_infos.insert(stash.clone(), staker_info);
-	}
-
-	let slashable_balance = |who: &AccountId| -> Balance { staker_infos.get(who).unwrap().stake };
-	let slashable_balance_votes = |who: &AccountId| -> VoteWeight {
-		<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(
-			slashable_balance(who),
-		)
-	};
-
-	let mut all_voters_and_stake = all_voters
-		.into_iter()
-		.map(|(v, t)| (v.clone(), slashable_balance_votes(&v), t))
-		.collect::<Vec<_>>();
+	let mut all_voters_and_stake = get_voters(&client, at).await;
 
 	if let Some(path) = conf.manual_override {
 		#[derive(serde::Serialize, serde::Deserialize)]
 		struct Override {
-			pub voters: Vec<(AccountId, u64, Vec<AccountId>)>,
-			pub voters_remove: Vec<AccountId>,
-			pub candidates: Vec<AccountId>,
-			pub candidates_remove: Vec<AccountId>,
+			voters: Vec<(AccountId, u64, Vec<AccountId>)>,
+			voters_remove: Vec<AccountId>,
+			candidates: Vec<AccountId>,
+			candidates_remove: Vec<AccountId>,
 		}
 
 		let file = std::fs::read(path).unwrap();
@@ -225,7 +200,7 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 				all_voters_and_stake.iter_mut().find(|vv| vv.0 == v.0)
 			{
 				println!("manual override: {:?} is already a voter. Overriding votes.", v.0);
-				already_existing_voter.1 = v.1;
+				already_existing_voter.1 = v.1.into();
 				already_existing_voter.2 = v.2.clone();
 			} else {
 				println!("manual override: {:?} is added as voters.", v.0);
@@ -238,10 +213,15 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	}
 
 	// add self-vote
-	candidates.iter().for_each(|v| {
-		let self_vote = (v.clone(), slashable_balance_votes(&v), vec![v.clone()]);
+	for c in candidates.iter() {
+		let self_vote =
+			(c.clone(), to_vote_weight(stake_of(&c, &client, at).await), vec![c.clone()]);
 		all_voters_and_stake.push(self_vote);
-	});
+	}
+
+	let slashable_balance_votes = |who: &AccountId| -> VoteWeight {
+		all_voters_and_stake.iter().find(|v| &v.0 == who).map(|v| v.1).unwrap_or_default()
+	};
 
 	// run phragmen
 	t_start!(phragmen_run);
@@ -321,13 +301,13 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 		log::info!("💰 Nominator Assignments:");
 		let mut counter = 1;
 		for (nominator, info) in nominator_info.iter() {
-			let staker_info = staker_infos.get(&nominator).unwrap();
 			let mut sum = 0;
+			let nom_stake = slashable_balance_votes(&nominator);
 			println!(
 				"#{} {:?} // active_stake = {:?}",
 				counter,
 				nominator,
-				Currency::from(staker_info.stake),
+				Currency::from(nom_stake.into()),
 			);
 			println!("  Distributions:");
 			info.iter().enumerate().for_each(|(i, (c, s))| {
@@ -335,10 +315,9 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 				println!("    #{} {:?} => {:?}", i, c, Currency::from(*s));
 			});
 			counter += 1;
-			let diff = sum.max(staker_info.stake) - sum.min(staker_info.stake);
+			let diff = sum.max(nom_stake.into()) - sum.min(nom_stake.into());
 			// acceptable diff is one millionth of a Currency
 			assert!(diff < 1_000, "diff( sum_nominations,  staker_info.ledger.active) = {}", diff);
-			println!("");
 		}
 	}
 

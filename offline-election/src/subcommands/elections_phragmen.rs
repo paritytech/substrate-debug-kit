@@ -5,7 +5,7 @@ use crate::{
 };
 use sp_npos_elections::*;
 use sp_runtime::traits::{Convert, Zero};
-use std::{collections::BTreeMap, str::from_utf8, string};
+use std::collections::BTreeMap;
 
 const MODULE: &[u8] = b"PhragmenElection";
 
@@ -90,7 +90,6 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 		<network::CurrencyToVoteHandler as Convert<Balance, VoteWeight>>::convert(b)
 	};
 
-	t_start!(data_scrape);
 	// all candidates
 	let mut candidates = get_candidates(client, at).await;
 
@@ -153,7 +152,6 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 	for (voter, budget, _) in all_voters.iter() {
 		voter_weight.insert(voter.clone(), *budget);
 	}
-	t_stop!(data_scrape);
 
 	let weight_of = |who: &AccountId| -> VoteWeight { *voter_weight.get(who).unwrap() };
 
