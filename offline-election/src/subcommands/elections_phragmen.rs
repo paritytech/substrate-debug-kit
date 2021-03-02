@@ -5,7 +5,7 @@ use crate::{
 };
 use sp_npos_elections::*;
 use sp_runtime::traits::{Convert, Zero};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap};
 
 const MODULE: &[u8] = b"PhragmenElection";
 
@@ -102,9 +102,16 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 
 	if let Some(path) = conf.manual_override {
 		#[derive(serde::Serialize, serde::Deserialize)]
+		struct VotersMutate {
+			who: AccountId,
+			votes: Vec<AccountId>,
+		}
+
+		#[derive(serde::Serialize, serde::Deserialize)]
 		struct Override {
 			pub voters: Vec<(AccountId, u64, Vec<AccountId>)>,
 			pub voters_remove: Vec<AccountId>,
+			pub voters_mutate: Vec<VotersMutate>,
 			pub candidates: Vec<AccountId>,
 			pub candidates_remove: Vec<AccountId>,
 		}
@@ -130,7 +137,7 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 			if let Some(mut already_existing_voter) = all_voters.iter_mut().find(|vv| vv.0 == v.0) {
 				log::warn!(
 					target: LOG_TARGET,
-					"manual override: {:?} is already a voter. Overriding votes.",
+					"manual override: {:?} is already a voter. Overriding votes and stake.",
 					v.0,
 				);
 				already_existing_voter.1 = v.1;
@@ -138,6 +145,14 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 			} else {
 				log::warn!(target: LOG_TARGET, "manual override: {:?} is added as voters.", v.0);
 				all_voters.push(v.clone())
+			}
+		});
+
+		manual.voters_mutate.iter().for_each(|VotersMutate { who, votes }| {
+			if let Some(mut already_existing_voter) = all_voters.iter_mut().find(|vv| &vv.0 == who)
+			{
+				log::warn!(target: LOG_TARGET, "manual override: {:?}. Overriding votes.", who);
+				already_existing_voter.2 = votes.clone();
 			}
 		});
 
@@ -166,14 +181,10 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 
 	let elected_stashes = winners.iter().map(|(s, _)| s.clone()).collect::<Vec<AccountId>>();
 
-	t_start!(ratio_into_staked_run);
 	let staked_assignments = assignment_ratio_to_staked(assignments.clone(), weight_of);
-	t_stop!(ratio_into_staked_run);
 
-	t_start!(build_support_map_run);
 	let supports =
 		to_support_map::<AccountId>(&elected_stashes, staked_assignments.as_slice()).unwrap();
-	t_stop!(build_support_map_run);
 
 	log::info!(target: LOG_TARGET, "👨🏻‍⚖️ Members:");
 	for (i, s) in winners.iter().enumerate() {
@@ -204,11 +215,11 @@ pub async fn run(client: &Client, opt: Opt, conf: CouncilConfig) {
 	let new_members = winners.into_iter().take(desired_members as usize).collect::<Vec<_>>();
 	let mut prime_votes: Vec<_> = new_members.iter().map(|(c, _)| (c, Balance::zero())).collect();
 	for (_, stake, targets) in all_voters.into_iter() {
-		for (votes, who) in
+		for (vote_multiplier, who) in
 			targets.iter().enumerate().map(|(votes, who)| ((16 - votes) as u32, who))
 		{
 			if let Ok(i) = prime_votes.binary_search_by_key(&who, |k| k.0) {
-				prime_votes[i].1 += (stake as Balance) * (votes as Balance);
+				prime_votes[i].1 += (stake as Balance) * (vote_multiplier as Balance);
 			}
 		}
 	}
