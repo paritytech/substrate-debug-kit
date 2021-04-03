@@ -282,7 +282,7 @@ pub struct StakingConfig {
 	#[structopt(short, long, default_value = "0")]
 	iterations: usize,
 
-	#[structopt(short, long, default_value = "128")]
+	#[structopt(long, default_value = "128")]
 	max_payouts: usize,
 
 	/// If reduce is applied to the output.
