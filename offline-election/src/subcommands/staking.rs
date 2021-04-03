@@ -42,6 +42,15 @@ async fn get_candidates(client: &Client, at: Hash) -> Vec<AccountId> {
 		.collect::<Vec<AccountId>>()
 }
 
+async fn get_candidates_paged(client: &Client, at: Hash) -> Vec<AccountId> {
+	storage::enumerate_map_paged::<AccountId, OldValidatorPrefs>(MODULE, b"Validators", client, at,None::<usize>)
+		.await
+		.expect("Staking::validators should be enumerable.")
+		.into_iter()
+		.map(|(v, _p)| v)
+		.collect::<Vec<AccountId>>()
+}
+
 async fn stake_of(stash: &AccountId, client: &Client, at: Hash) -> Balance {
 	let ctrl = storage::read::<AccountId>(
 		storage::map_key::<frame_support::Twox64Concat>(MODULE, b"Bonded", stash.as_ref()),
@@ -164,7 +173,9 @@ pub async fn run(client: &Client, opt: Opt, conf: StakingConfig) {
 	}
 
 	// stash key of all wannabe candidates.
-	let mut candidates = get_candidates(client, at).await;
+	let mut candidates = get_candidates_paged(client, at).await;
+
+	println!("candicates length by enumerate_map_paged: {:?}", candidates.len());
 
 	// stash key of current voters, including maybe self vote.
 	let mut all_voters_and_stake = get_voters(&client, at).await;

@@ -22,6 +22,7 @@ use codec::Decode;
 use frame_support::StorageHasher;
 use sp_core::hashing::twox_128;
 use std::fmt::Debug;
+use std::cmp;
 
 use jsonrpsee_http_client::{HttpClient, HttpConfig};
 use jsonrpsee_ws_client::{WsClient, WsConfig};
@@ -32,11 +33,13 @@ use jsonrpsee_types::jsonrpc::{Params, to_value as to_json_value};
 pub mod helpers;
 
 /// re-export some stuff from sp-core.
-pub use sp_core::storage::{StorageData, StorageKey};
+pub use sp_core::storage::{StorageData, StorageKey,StorageChangeSet};
 /// The hash type used by this crate.
 pub type Hash = sp_core::hash::H256;
 // TODO: write a basic abstraction above the two?
 pub type Client = WsClient;
+
+const PAGE_SIZE: usize = 256;
 
 /// Create a client
 pub async fn create_ws_client(endpoint: &str) -> WsClient {
@@ -173,6 +176,98 @@ where
 			}
 		})
 		.collect::<Result<Vec<(K, V)>, &'static str>>()
+}
+
+/// Read from keys regardless of the type.
+pub async fn batchRead(keys: Vec<StorageKey>, client: &Client, at: Hash) -> Vec<(StorageKey, StorageData)> {
+	let change_sets:Vec<StorageChangeSet<Hash>> = client
+		.request("state_queryStorageAt", Params::Array(vec![to_json_value(keys).expect("json error"), to_json_value(at).expect("json error")]))
+		.await
+		.expect("state_queryStorageAt failed");
+
+	let mut result:Vec<(StorageKey, StorageData)> = vec![];
+	for change_set in change_sets {
+		for (k, v) in change_set.changes {
+			if let Some(v) = v {
+				result.push((k, v));
+			}
+		}
+	}
+	result
+}
+
+/// Enumerate all keys and values in a storage map with state_getKeysPaged
+pub async fn enumerate_map_paged<K, V>(
+	module: &[u8],
+	storage: &[u8],
+	client: &Client,
+	at: Hash,
+	max:Option<usize>,
+) -> Result<Vec<(K, V)>, &'static str>
+	where
+		K: Decode + Debug + Clone + AsRef<[u8]>,
+		V: Decode + Clone + Debug,
+{
+	let serialized_prefix = to_json_value(map_prefix_key(module.clone(), storage.clone())).expect("StorageKey serialization infallible");
+	let mut result:Vec<(K, V)> = vec![];
+	let mut start = serialized_prefix.clone();
+	let max = max.unwrap_or(usize::MAX);
+	loop {
+		let pageKeys:Vec<StorageKey> = client
+			.request("state_getKeysPaged", Params::Array(vec![serialized_prefix.clone(), to_json_value(cmp::min(PAGE_SIZE,max)).unwrap(), start,to_json_value(at.clone()).unwrap()]))
+			.await
+			.expect("Storage state_getKeysPaged failed");
+		let pairs = batchRead(pageKeys.clone(),client,at).await;
+		let innerResult = pairs.into_iter()
+			.map(|(k, v)| {
+				let mut full_key = k.0;
+				let full_len = full_key.len();
+				let key = full_key.drain(full_len - 32..).collect::<Vec<_>>();
+				(key, v.0)
+			})
+			.map(|(raw_key, raw_value)| {
+				let key = <K as Decode>::decode(&mut raw_key.as_slice());
+				let value = <V as Decode>::decode(&mut raw_value.as_slice());
+				match (key, value) {
+					(Ok(key), Ok(value)) => Ok((key, value)),
+					_ => Err("failed to decode map prefix"),
+				}
+			})
+			.collect::<Result<Vec<(K, V)>, &'static str>>();
+
+		result.extend(innerResult.expect("failed to decode map"));
+		if pageKeys.len() < PAGE_SIZE || result.len() >= max {
+			break
+		}
+		start = to_json_value(pageKeys[pageKeys.len()-1].clone()).unwrap();
+	}
+	return Ok(result)
+}
+
+/// Get storage keys located under a certain prefix with state_getKeysPaged
+pub async fn get_keys_paged(
+	prefix: StorageKey,
+	client: &Client,
+	at: Hash,
+	max:usize,
+) -> Vec<StorageKey> {
+	let serialized_prefix = to_json_value(prefix).expect("StorageKey serialization infallible");
+	let at = to_json_value(at).expect("Block hash serialization infallible");
+	let mut result = vec![];
+	let mut start = serialized_prefix.clone();
+	loop {
+		let page_result:Vec<StorageKey> = client
+			.request("state_getKeysPaged", Params::Array(vec![serialized_prefix.clone(), to_json_value(cmp::min(PAGE_SIZE,max)).unwrap(), start.clone(), at.clone()]))
+			.await
+			.expect("Storage state_getKeysPaged failed");
+		result.extend(page_result.clone());
+		if page_result.len() < PAGE_SIZE || result.len() >=max {
+			break
+		}
+		let last = page_result.len()-1;
+		start = to_json_value(page_result[last].clone()).unwrap();
+	}
+	return result;
 }
 
 /// Unwrap an decode a metadata entry.
