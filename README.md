@@ -26,6 +26,17 @@ A collection of debug tools and libraries around substrate chains.
   like `DOT`. Somewhat similar to the `toHuman()` interface of the javascript API.
 - **`laboratory`**: This is where I try new stuff.
 
+## Build Substrate Debug Kit
+- `git clone https://github.com/paritytech/substrate-debug-kit/`
+- `cd substrate-debug-kit`
+- `cargo build --release`
+
+## Example commands for the debug tools
+##### Note: Run local Polkadot or Kusama node, or start local development node e.g. `polkadot --dev --tmp`
+- The sub-du command to read all of the chain storage usage `./target/release/sub-du`
+- The offline-election tool for staking `./target/release/offline-election staking -i 10 -r`
+- The offline-election tool to review a validator `./target/release/offline-election validator-check --who CpYNXnYC1mPPRSXMHvm9EUuhEqHjvj6kCN4kshqMdEpPYSF`
+
 ## Brain Dump 🧠
 
 - **Substrate module sidecar**: A wrapper around remote-externalities that allows you to run a
