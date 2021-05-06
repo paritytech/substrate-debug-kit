@@ -51,7 +51,7 @@ impl_outer_dispatch! {
 	}
 }
 
-impl frame_system::Trait for Runtime {
+impl frame_system::Config for Runtime {
 	type AccountData = pallet_balances::AccountData<Balance>;
 	type AccountId = AccountId;
 	type AvailableBlockRatio = AvailableBlockRatio;
@@ -79,7 +79,7 @@ impl frame_system::Trait for Runtime {
 	type Version = ();
 }
 
-impl pallet_balances::Trait for Runtime {
+impl pallet_balances::Config for Runtime {
 	type AccountStore = frame_system::Module<Runtime>;
 	type Balance = Balance;
 	type DustRemoval = ();
@@ -92,7 +92,7 @@ impl pallet_balances::Trait for Runtime {
 parameter_types! {
 	pub const MinimumPeriod: u64 = 5;
 }
-impl pallet_timestamp::Trait for Runtime {
+impl pallet_timestamp::Config for Runtime {
 	type MinimumPeriod = MinimumPeriod;
 	type Moment = u64;
 	type OnTimestampSet = ();
@@ -124,7 +124,7 @@ impl pallet_session::SessionHandler<AccountId> for TestSessionHandler {
 	fn on_disabled(_: usize) {}
 }
 
-impl pallet_session::Trait for Runtime {
+impl pallet_session::Config for Runtime {
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
 	type Event = ();
 	type Keys = SessionKeys;
@@ -132,14 +132,14 @@ impl pallet_session::Trait for Runtime {
 	type SessionHandler = TestSessionHandler;
 	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, Staking>;
 	type ShouldEndSession = pallet_session::PeriodicSessions<(), ()>;
-	type ValidatorId = <Self as frame_system::Trait>::AccountId;
+	type ValidatorId = <Self as frame_system::Config>::AccountId;
 	type ValidatorIdOf = pallet_staking::StashOf<Self>;
 	type WeightInfo = ();
 }
 
-impl pallet_session::historical::Trait for Runtime {
+impl pallet_session::historical::Config for Runtime {
 	type FullIdentification =
-		pallet_staking::Exposure<<Self as frame_system::Trait>::AccountId, Balance>;
+		pallet_staking::Exposure<<Self as frame_system::Config>::AccountId, Balance>;
 	type FullIdentificationOf = pallet_staking::ExposureOf<Self>;
 }
 
@@ -202,7 +202,7 @@ pub fn offchainify(ext: &mut TestExternalities, iterations: u32) -> Arc<RwLock<P
 	pool_state
 }
 
-impl pallet_staking::Trait for Runtime {
+impl pallet_staking::Config for Runtime {
 	type BondingDuration = BondingDuration;
 	type Currency = pallet_balances::Module<Runtime>;
 	type CurrencyToVote = frame_support::traits::U128CurrencyToVote;

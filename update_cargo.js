@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { networkInterfaces } = require('os');
 const path = require('path')
-const dirs = ["remote-externalities", "offline-election", "sub-storage", "sub-du"]
+const dirs = ["remote-externalities", "offline-election", "sub-storage", "sub-du", "staking-miner"]
 
 const VERSION_TYPE = {
 	EXACT: "3.0.0",
