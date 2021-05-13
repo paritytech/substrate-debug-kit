@@ -7,23 +7,57 @@ edition = "2018"
 [workspace]
 
 [dependencies]
-async-std = { version = "1.9.0", features = ["attributes"] }
+serde = { version = "1.0.123" }
 codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false, features = ["derive"] }
 log = "0.4.11"
-env_logger = "0.7.1"
+env_logger = "0.8.3"
 hex-literal = "0.3.1"
-separator = "0.4.1"
+smallvec = "1.6.1"
 
-sp-runtime = { version = "3.0.0" }
-sp-core = { version = "3.0.0" }
-frame-support = { version = "3.0.0" }
-frame-system = { version = "3.0.0" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "master", features = ["std"] }
+sp-version = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-application-crypto = { git = "https://github.com/paritytech/substrate", branch = "master" }
 
-# Add any other pallet that you might want to test here.
-pallet-society = { version = "3.0.0" }
-pallet-staking = { version = "3.0.0" }
-pallet-balances = { version = "3.0.0" }
-pallet-transaction-payment = { version = "3.0.0" }
-frame-election-provider-support = { git = "https://github.com/paritytech/substrate", branch = "master" }
-pallet-election-provider-multi-phase = { git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-executive = { git = "https://github.com/paritytech/substrate", branch = "master" }
+
+pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "master" }
+pallet-indices = { git = "https://github.com/paritytech/substrate", branch = "master" }
+pallet-transaction-payment = { git = "https://github.com/paritytech/substrate", branch = "master" }
+pallet-timestamp = { git = "https://github.com/paritytech/substrate", branch = "master" }
+
+# staking system
+sp-npos-elections = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-staking = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-election-provider-multi-phase = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+frame-election-provider-support = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-staking-reward-curve = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-authority-discovery = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-session = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-babe = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-grandpa = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-im-online = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-offences = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+pallet-authorship = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+
+static_assertions = "1.1.0"
+
+[features]
+default = [ "staking-system" ]
+staking-system = [
+	"sp-npos-elections",
+	"pallet-staking",
+	"pallet-election-provider-multi-phase",
+	"frame-election-provider-support",
+	"pallet-staking-reward-curve",
+	"pallet-authority-discovery",
+	"pallet-session",
+	"pallet-babe",
+	"pallet-grandpa",
+	"pallet-im-online",
+	"pallet-offences",
+	"pallet-authorship",
+]
 
