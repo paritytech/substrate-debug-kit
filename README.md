@@ -6,6 +6,11 @@ A collection of debug tools and libraries around substrate chains.
 > prior to [Kusama](https://kusama.network/)'s NPoS enabling as a tool to predict the outcome. Henceforth, it has evolved
 > into this repo. This functionality is still provided in the [`offline-elections`](https://github.com/paritytech/offline-phragmen/tree/master/offline-election) crate.
 
+
+# DEPRECATED 🚨 
+
+Almost all of the tools in this repository are no longer maintained. Some are moved to substrate (e.g. [`remote-externalities`)[https://github.com/paritytech/substrate/tree/master/utils/frame/remote-externalities]). Some are being re-worked in [Typescript](https://github.com/kianenigma/polkadot-scripts/), and some are scheduled to be re-done with Frame's new [Metadata](https://github.com/paritytech/substrate/pull/8615).
+
 ## Overview
 
 - **`sub-storage`**: This is the backbone of all of the crates in this repo. It provides a minimal
