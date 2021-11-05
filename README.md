@@ -9,7 +9,7 @@ A collection of debug tools and libraries around substrate chains.
 
 # DEPRECATED 🚨 
 
-Almost all of the tools in this repository are no longer maintained. Some are moved to substrate (e.g. [`remote-externalities`)[https://github.com/paritytech/substrate/tree/master/utils/frame/remote-externalities]). Some are being re-worked in [Typescript](https://github.com/kianenigma/polkadot-scripts/), and some are scheduled to be re-done with Frame's new [Metadata](https://github.com/paritytech/substrate/pull/8615).
+Almost all of the tools in this repository are no longer maintained. Some are moved to substrate (e.g. [`remote-externalities`](https://github.com/paritytech/substrate/tree/master/utils/frame/remote-externalities). Some are being re-worked in [Typescript](https://github.com/kianenigma/polkadot-scripts/), and some are scheduled to be re-done with Frame's new [Metadata](https://github.com/paritytech/substrate/pull/8615).
 
 ## Overview
 
