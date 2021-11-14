@@ -2,7 +2,7 @@
 name = "offline-election"
 version = "1.0.0"
 authors = ["Parity Technologies <admin@parity.io>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 async-std = { version = "1.9.0", features = ["attributes"] }

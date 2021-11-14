@@ -2,7 +2,7 @@
 name = "remote-externalities"
 version = "0.1.0"
 authors = ["kianenigma <kian.peymani@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 jsonrpsee-types = { git = "https://github.com/paritytech/jsonrpsee", rev = "4025c0f67298ab7216214feac4e2c29ca9b24710" }
