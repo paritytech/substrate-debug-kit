@@ -2,7 +2,7 @@
 name = "remote-ext-elections-phragmen"
 version = "0.1.0"
 authors = ["kianenigma <kian.peymani@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # This cannot be in the global workspace due to dependency gitch.
 [workspace]
